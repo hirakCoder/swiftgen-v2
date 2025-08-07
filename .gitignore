@@ -58,8 +58,10 @@ DerivedData/
 .env.production
 config.json
 
-# Test files
-test_*.py
-*_test.py
+# Test files (exclude only in root)
+/test_*.py
+/*_test.py
 scratch/
 temp/
+# Allow test directory
+!tests/
