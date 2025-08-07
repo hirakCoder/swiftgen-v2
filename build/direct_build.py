@@ -241,25 +241,54 @@ class DirectBuildSystem:
                 print(f"[DIRECT BUILD] Successfully compiled {len(swift_files)} files")
                 return True
             else:
-                print(f"[DIRECT BUILD] Compilation failed: {result.stderr}")
-                # Try to fix and recompile
+                print(f"[DIRECT BUILD] Compilation failed, attempting auto-fix...")
+                
+                # Use the new error handler for comprehensive fixes
+                try:
+                    from core.error_handler import error_fixer
+                    
+                    # Apply auto-fixes
+                    fix_result = error_fixer.auto_fix_compilation_errors(
+                        result.stderr, 
+                        project_path
+                    )
+                    
+                    if fix_result["success"]:
+                        print(f"[DIRECT BUILD] Applied {fix_result['fixed_count']} fixes, retrying compilation...")
+                        
+                        # Retry compilation
+                        result = subprocess.run(
+                            compile_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                            cwd=project_path
+                        )
+                        
+                        if result.returncode == 0:
+                            print("[DIRECT BUILD] ✅ Compilation successful after auto-fix!")
+                            os.chmod(os.path.join(app_bundle, app_name), 0o755)
+                            return True
+                except ImportError:
+                    print("[DIRECT BUILD] Error handler not available, using legacy fixes")
+                
+                # Fall back to legacy fixes
                 if 'has no member' in result.stderr or 'cannot find' in result.stderr or 'inheritance from non-protocol' in result.stderr:
                     self._fix_compilation_errors(project_path, result.stderr)
-                    # Retry compilation with additional frameworks if needed
-                    retry_cmd = compile_cmd.copy()
-                    if 'App' in result.stderr and '-framework' not in str(retry_cmd):
-                        # Ensure SwiftUI framework is included
-                        idx = retry_cmd.index('-o')
-                        retry_cmd.insert(idx, 'SwiftUI')
-                        retry_cmd.insert(idx, '-framework')
+                    # Retry compilation
                     result = subprocess.run(
-                        retry_cmd,
+                        compile_cmd,
                         capture_output=True,
                         text=True,
                         timeout=30,
                         cwd=project_path
                     )
-                    return result.returncode == 0
+                    
+                    if result.returncode == 0:
+                        os.chmod(os.path.join(app_bundle, app_name), 0o755)
+                        return True
+                
+                print(f"[DIRECT BUILD] Failed after auto-fix attempts: {result.stderr[:500]}")
                 return False
         except Exception as e:
             print(f"[DIRECT BUILD] Compilation error: {e}")

@@ -41,6 +41,10 @@ server.log
 .env
 *.cache
 build_cache/
+# Allow build directory but not build artifacts
+!build/
+build/*.app
+build/*.dSYM
 
 # Xcode
 *.xcodeproj
@@ -54,8 +58,10 @@ DerivedData/
 .env.production
 config.json
 
-# Test files
-test_*.py
-*_test.py
+# Test files (exclude only in root)
+/test_*.py
+/*_test.py
 scratch/
 temp/
+# Allow test directory
+!tests/
