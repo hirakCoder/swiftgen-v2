@@ -229,6 +229,30 @@ class SwiftGenPipeline:
     
     async def _generate_code(self, intent: AppIntent) -> Dict:
         """Generate code based on intent"""
+        # Try simple generator first for basic apps
+        if intent.app_type in ['counter', 'timer', 'todo', 'calculator']:
+            from generation.simple_generator import simple_generator
+            
+            project_path = f"workspaces/temp_{intent.app_name.lower()}"
+            result = await simple_generator.generate_app(
+                intent.raw_request,
+                intent.core_features,
+                project_path
+            )
+            
+            if result['success']:
+                # Convert to expected format
+                files = []
+                for filename, content in result['files'].items():
+                    files.append({
+                        'path': f"Sources/{filename}",
+                        'content': content
+                    })
+                return {
+                    'files': files,
+                    'app_name': intent.app_name
+                }
+        
         if not self.llm_service:
             # Return minimal template if no LLM service
             return self._get_minimal_template(intent)

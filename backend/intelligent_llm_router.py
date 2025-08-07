@@ -78,23 +78,78 @@ class IntelligentLLMRouter:
             'resolve', 'repair', 'broken', 'fail', 'memory leak', 'leak'
         ]
     
-    def analyze_request(self, description: str, modification_history: List[Dict] = None) -> RequestType:
-        """Analyze request to determine its type"""
+    def analyze_request(self, description: str, modification_history: List[Dict] = None, is_modification_context: bool = False) -> RequestType:
+        """Analyze request to determine its type
+        
+        Args:
+            description: The request description
+            modification_history: Previous modifications if any
+            is_modification_context: True if this is called from a modification endpoint
+        """
         desc_lower = description.lower()
         
         # Debug logging
-        logger.info(f"Analyzing request: {description}")
+        logger.info(f"Analyzing request: {description[:100]}...")
         logger.info(f"Modification history present: {modification_history is not None}")
+        logger.info(f"Is modification context: {is_modification_context}")
         
         # Check if this is app creation (not modification)
-        # IMPORTANT: Don't match "build" in error messages like "Fix these build errors"
-        creation_keywords = ['create', 'make', 'develop', 'design a', 'design an']
-        # Special handling for "build" - only match if it's about building an app, not build errors
-        is_creation = any(keyword in desc_lower for keyword in creation_keywords)
-        if not is_creation and 'build' in desc_lower:
-            # Only consider it creation if "build" is used in context of creating an app
-            # Not when it's about build errors or build process
-            is_creation = not any(error_word in desc_lower for error_word in ['error', 'fix', 'fail', 'timeout'])
+        # If explicitly marked as modification context, skip creation detection
+        if is_modification_context:
+            logger.info("Skipping creation detection - explicit modification context")
+            is_creation = False
+        else:
+            # IMPORTANT: Don't match "build" in error messages like "Fix these build errors"
+            # More precise creation detection - avoid false positives
+            creation_patterns = [
+                r'\bcreate\s+(a|an|the)?\s*(new)?\s*app\b',
+                r'\bmake\s+(a|an|the)?\s*(new)?\s*app\b',
+                r'\bdevelop\s+(a|an|the)?\s*(new)?\s*app\b',
+                r'\bdesign\s+(a|an|the)?\s*(new)?\s*app\b',
+                r'\bbuild\s+(a|an|the)?\s*(new)?\s*app\b'
+            ]
+            
+            # Check for app creation patterns
+            is_creation = any(re.search(pattern, desc_lower) for pattern in creation_patterns)
+            if is_creation:
+                logger.info(f"Matched app creation pattern")
+            
+            # Check for modification-specific patterns FIRST
+            # These indicate modifications, not app creation
+            modification_indicators = [
+                'make it',  # "make it more colorful"
+                'make the',  # "make the app beautiful"
+                'build a better',  # "build a better UI"
+                'create a new page',  # UI element creation
+                'create a settings',  # Settings page
+                'design a new icon',  # Icon design
+                'develop additional',  # Additional features
+                'make this',  # "make this faster"
+                'create new',  # "create new animations"
+            ]
+            
+            is_likely_modification = any(indicator in desc_lower for indicator in modification_indicators)
+            if is_likely_modification:
+                logger.info(f"Detected modification indicators in: '{description[:50]}'")
+            
+            # Also check for simple creation keywords at start of request
+            # BUT only if they explicitly mention "app" or similar AND not a modification pattern
+            if not is_creation and not is_likely_modification:
+                simple_creation = ['create a', 'make a', 'build a', 'develop a', 'design a']
+                # Only consider it creation if it starts with these AND contains app-related words
+                if any(desc_lower.startswith(keyword) for keyword in simple_creation):
+                    # Check if it's actually about creating an app, not modifying
+                    app_indicators = ['app', 'application', 'project', 'program']
+                    is_creation = any(indicator in desc_lower for indicator in app_indicators)
+            # If we detected modification indicators, override any creation detection
+            if is_likely_modification and is_creation:
+                logger.info(f"Detected modification indicators, overriding creation detection")
+                is_creation = False
+            
+            if not is_creation and 'build' in desc_lower:
+                # Only consider it creation if "build" is used in context of creating an app
+                # Not when it's about build errors or build process
+                is_creation = not any(error_word in desc_lower for error_word in ['error', 'fix', 'fail', 'timeout'])
         logger.info(f"Is creation request: {is_creation}")
         
         # ROBUST SOLUTION: If it's a creation request without a modification history,
@@ -152,9 +207,9 @@ class IntelligentLLMRouter:
         logger.info(f"Returning SIMPLE_MODIFICATION (ui_score={ui_score}, algo_score={algo_score}, data_score={data_score})")
         return RequestType.SIMPLE_MODIFICATION
     
-    def route_initial_request(self, description: str, app_type: str = None, available_providers: List[str] = None) -> str:
+    def route_initial_request(self, description: str, app_type: str = None, available_providers: List[str] = None, is_modification: bool = False) -> str:
         """Route initial request to most appropriate LLM"""
-        request_type = self.analyze_request(description)
+        request_type = self.analyze_request(description, is_modification_context=is_modification)
         
         logger.info(f"Request analyzed as: {request_type.value}")
         

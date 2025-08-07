@@ -62,15 +62,29 @@ class FlexibleModificationHandler:
         # Call LLM for modification
         if self.llm_service:
             try:
-                response = await self.llm_service.generate(prompt)
-                
-                # Parse and validate response
-                if hasattr(response, 'content'):
-                    modified_code = json.loads(response.content)
-                elif isinstance(response, dict):
+                # Check if this is enhanced_claude_service with modify_ios_app method
+                if hasattr(self.llm_service, 'modify_ios_app'):
+                    # Use the modification-specific method
+                    response = await self.llm_service.modify_ios_app(
+                        app_name=app_name,
+                        description="",  # Not used in our context
+                        modification=modification_request,
+                        files=existing_files,
+                        existing_bundle_id=f"com.swiftgen.{app_name.lower()}",
+                        project_tracking_id=project_id
+                    )
                     modified_code = response
                 else:
-                    modified_code = json.loads(str(response))
+                    # Fallback to generic generate for other LLM services
+                    response = await self.llm_service.generate(prompt)
+                    
+                    # Parse and validate response
+                    if hasattr(response, 'content'):
+                        modified_code = json.loads(response.content)
+                    elif isinstance(response, dict):
+                        modified_code = response
+                    else:
+                        modified_code = json.loads(str(response))
                 
                 # Validate the modification
                 validation = FlexiblePromptBuilder.validate_response(modified_code)
@@ -148,7 +162,30 @@ class FlexibleModificationHandler:
     
     def _save_modified_files(self, project_path: str, files: List[Dict]):
         """Save modified files to disk"""
+        # First check for duplicate @main files
+        sources_dir = os.path.join(project_path, 'Sources')
+        existing_app_files = []
+        
+        if os.path.exists(sources_dir):
+            # Find existing app files with @main
+            for filename in os.listdir(sources_dir):
+                if filename.endswith('App.swift') and filename != 'App.swift':
+                    existing_app_files.append(filename)
+        
+        # Filter out duplicate App.swift if we have a specific app file
+        files_to_save = []
         for file_info in files:
+            file_name = os.path.basename(file_info['path'])
+            
+            # Skip generic App.swift if we already have a specific app file
+            if file_name == 'App.swift' and existing_app_files:
+                print(f"[MODIFY] Skipping duplicate App.swift (keeping {existing_app_files[0]})")
+                continue
+            
+            files_to_save.append(file_info)
+        
+        # Now save the filtered files
+        for file_info in files_to_save:
             file_path = os.path.join(project_path, file_info['path'])
             
             # Ensure directory exists

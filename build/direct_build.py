@@ -40,7 +40,16 @@ class DirectBuildSystem:
         app_bundle = os.path.join(build_dir, f'{app_name}.app')
         os.makedirs(app_bundle, exist_ok=True)
         
-        # Step 3: Fix Swift code quality issues first
+        # Step 3: Fix duplicate @main files before building
+        try:
+            from backend.duplicate_main_validator import DuplicateMainValidator
+            validation_result = DuplicateMainValidator.validate_and_fix(project_path)
+            if validation_result['actions']:
+                print(f"[DIRECT BUILD] Fixed duplicate @main: {validation_result['actions']}")
+        except Exception as e:
+            print(f"[DIRECT BUILD] Warning: Could not validate @main files: {e}")
+        
+        # Step 4: Fix Swift code quality issues
         self._improve_code_quality(project_path)
         
         # Step 4: Compile Swift files
@@ -70,9 +79,47 @@ class DirectBuildSystem:
                 'message': 'App launched successfully!'
             }
         else:
+            # Try to recover from build/launch errors
+            print("[DIRECT BUILD] Launch failed, attempting recovery...")
+            
+            try:
+                from core.build_error_recovery import build_error_recovery
+                
+                # Generate diagnostic info
+                diagnostic = build_error_recovery.generate_diagnostic_report(project_path, app_bundle)
+                print(diagnostic)
+                
+                # Attempt recovery
+                recovery_result = await build_error_recovery.recover_from_build_error(
+                    "Failed to launch app in simulator",
+                    project_path,
+                    app_bundle,
+                    bundle_id
+                )
+                
+                if recovery_result["success"]:
+                    print(f"[DIRECT BUILD] {recovery_result['message']}")
+                    
+                    # Try launching again
+                    launch_success = await self.simulator.install_and_launch(
+                        app_bundle,
+                        bundle_id,
+                        bring_to_focus=True
+                    )
+                    
+                    if launch_success:
+                        return {
+                            'success': True,
+                            'app_path': app_bundle,
+                            'bundle_id': bundle_id,
+                            'message': 'App launched after recovery!'
+                        }
+            except Exception as e:
+                print(f"[DIRECT BUILD] Recovery failed: {e}")
+            
             return {
                 'success': False,
-                'error': 'Failed to launch app in simulator'
+                'error': 'Failed to launch app in simulator after recovery attempts'
             }
     
     def _get_app_name(self, project_path: str) -> str:
@@ -243,18 +290,25 @@ class DirectBuildSystem:
             else:
                 print(f"[DIRECT BUILD] Compilation failed, attempting auto-fix...")
                 
-                # Use the new error handler for comprehensive fixes
+                # Use intelligent error recovery (pattern + LLM)
                 try:
-                    from core.error_handler import error_fixer
+                    from core.intelligent_error_recovery import intelligent_recovery
                     
-                    # Apply auto-fixes
-                    fix_result = error_fixer.auto_fix_compilation_errors(
+                    # Set up LLM service if available
+                    try:
+                        from generation.llm_router import LLMRouter
+                        intelligent_recovery.llm_service = LLMRouter()
+                    except:
+                        pass
+                    
+                    # Apply intelligent recovery
+                    fix_result = await intelligent_recovery.recover_from_error(
                         result.stderr, 
                         project_path
                     )
                     
                     if fix_result["success"]:
-                        print(f"[DIRECT BUILD] Applied {fix_result['fixed_count']} fixes, retrying compilation...")
+                        print(f"[DIRECT BUILD] {fix_result['message']}")
                         
                         # Retry compilation
                         result = subprocess.run(
@@ -266,11 +320,34 @@ class DirectBuildSystem:
                         )
                         
                         if result.returncode == 0:
-                            print("[DIRECT BUILD] ✅ Compilation successful after auto-fix!")
+                            print("[DIRECT BUILD] ✅ Compilation successful after intelligent recovery!")
                             os.chmod(os.path.join(app_bundle, app_name), 0o755)
                             return True
-                except ImportError:
-                    print("[DIRECT BUILD] Error handler not available, using legacy fixes")
+                        else:
+                            print("[DIRECT BUILD] Still has errors after recovery, trying one more time...")
+                            # One more attempt with fallback strategies
+                            from core.error_handler import error_fixer
+                            error_fixer.auto_fix_compilation_errors(result.stderr, project_path)
+                            
+                            result = subprocess.run(
+                                compile_cmd,
+                                capture_output=True,
+                                text=True,
+                                timeout=30,
+                                cwd=project_path
+                            )
+                            
+                            if result.returncode == 0:
+                                os.chmod(os.path.join(app_bundle, app_name), 0o755)
+                                return True
+                            
+                except ImportError as e:
+                    print(f"[DIRECT BUILD] Intelligent recovery not available: {e}, using basic fixes")
+                    from core.error_handler import error_fixer
+                    fix_result = error_fixer.auto_fix_compilation_errors(
+                        result.stderr,
+                        project_path
+                    )
                 
                 # Fall back to legacy fixes
                 if 'has no member' in result.stderr or 'cannot find' in result.stderr or 'inheritance from non-protocol' in result.stderr:
@@ -543,7 +620,7 @@ class SimulatorManager:
             subprocess.run(['open', '-a', 'Simulator'], check=False)
     
     async def _install_app(self, app_bundle: str) -> bool:
-        """Install app in simulator"""
+        """Install app in simulator with error recovery"""
         try:
             result = subprocess.run(
                 ['xcrun', 'simctl', 'install', self.simulator_id, app_bundle],
@@ -554,14 +631,46 @@ class SimulatorManager:
             
             if result.returncode != 0:
                 print(f"[SIMULATOR] Install error: {result.stderr}")
-                # Try to uninstall first then reinstall
-                bundle_name = os.path.basename(app_bundle).replace('.app', '')
-                bundle_id = f"com.swiftgen.{bundle_name.lower()}"
-                subprocess.run(
-                    ['xcrun', 'simctl', 'uninstall', self.simulator_id, bundle_id],
-                    capture_output=True,
-                    timeout=5
-                )
+                
+                # Attempt recovery based on error type
+                if "Could not hardlink" in result.stderr or "Unable to Install" in result.stderr:
+                    # Clean installation issue
+                    bundle_name = os.path.basename(app_bundle).replace('.app', '')
+                    bundle_id = f"com.swiftgen.{bundle_name.lower()}"
+                    
+                    # Force uninstall
+                    subprocess.run(
+                        ['xcrun', 'simctl', 'uninstall', self.simulator_id, bundle_id],
+                        capture_output=True,
+                        timeout=5
+                    )
+                    
+                    # Clean simulator caches
+                    subprocess.run(
+                        ['xcrun', 'simctl', 'spawn', self.simulator_id, 'rm', '-rf', 
+                         '/tmp/*', '/var/tmp/*'],
+                        capture_output=True
+                    )
+                    
+                    print("[SIMULATOR] Cleaned caches, retrying install...")
+                    
+                elif "Permission denied" in result.stderr:
+                    # Fix permissions
+                    subprocess.run(['chmod', '-R', '755', app_bundle], check=False)
+                    app_name = os.path.basename(app_bundle).replace('.app', '')
+                    executable = os.path.join(app_bundle, app_name)
+                    if os.path.exists(executable):
+                        subprocess.run(['chmod', '+x', executable], check=False)
+                    print("[SIMULATOR] Fixed permissions, retrying install...")
+                
+                elif "Info.plist" in result.stderr:
+                    # Fix Info.plist issues
+                    from core.build_error_recovery import build_error_recovery
+                    bundle_name = os.path.basename(app_bundle).replace('.app', '')
+                    bundle_id = f"com.swiftgen.{bundle_name.lower()}"
+                    build_error_recovery._fix_info_plist(app_bundle, bundle_id)
+                    print("[SIMULATOR] Fixed Info.plist, retrying install...")
+                
                 # Retry install
                 result = subprocess.run(
                     ['xcrun', 'simctl', 'install', self.simulator_id, app_bundle],

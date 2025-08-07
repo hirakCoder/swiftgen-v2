@@ -174,25 +174,28 @@ USER'S REQUEST: {modification_request}
 {mod_hints}
 
 MODIFICATION PRINCIPLES:
-• Interpret the request intelligently - understand what the user really wants
-• Maintain or improve the app's quality
-• Keep the existing style and patterns consistent
-• Ensure all existing features still work
-• Add smooth transitions for UI changes
+• ONLY make the changes explicitly requested - nothing more, nothing less
+• Preserve ALL existing UI, colors, layouts, and styling unless specifically asked to change them
+• Keep the existing code structure and patterns exactly as they are
+• Ensure all existing features continue to work exactly as before
+• If adding a new feature, integrate it minimally without redesigning existing UI
 • Follow Apple HIG for any new components
 
-QUALITY REQUIREMENTS:
-• No breaking changes to existing functionality
+STRICT REQUIREMENTS:
+• NO changes to existing UI elements unless explicitly requested
+• NO color scheme changes unless explicitly requested  
+• NO layout changes unless explicitly requested
+• NO style changes unless explicitly requested
+• NO refactoring unless explicitly requested
 • Maintain iOS 16.0+ compatibility
 • Keep accessibility support
 • Ensure responsive layout on all devices
-• Handle edge cases gracefully
 
-CREATIVE FREEDOM:
-• You can add related features that enhance the request
-• Improve the UX while making changes
-• Add delightful details if appropriate
-• Refactor for better code quality if needed
+WHAT TO CHANGE:
+• ONLY the specific feature/fix requested
+• Make minimal code changes to achieve the request
+• If the user asks to "enhance UI" or "improve UX", then and only then make broader changes
+• Default to conservative modifications unless user explicitly asks for creativity
 
 CURRENT CODE STRUCTURE:
 {existing_code[:3000]}...
@@ -202,6 +205,8 @@ IMPORTANT:
 • Maintain all imports and dependencies
 • Test that your changes compile and work
 • Keep the same file structure
+• DO NOT create a duplicate App.swift file - only modify the existing {app_name}App.swift
+• Never include both App.swift and {app_name}App.swift - use only {app_name}App.swift
 
 Return JSON with the modified implementation:
 {{
@@ -233,10 +238,18 @@ Return JSON with the modified implementation:
         
         # Feature additions
         elif any(word in request_lower for word in ['add', 'new', 'feature', 'include']):
-            hints.append("FEATURE ADDITION DETECTED:")
-            hints.append("• Integrate naturally with existing features")
-            hints.append("• Follow existing code patterns")
-            hints.append("• Add appropriate error handling")
+            # Check if UI/UX enhancement is also requested
+            if any(word in request_lower for word in ['enhance', 'improve', 'redesign', 'modern', 'better ui', 'better ux']):
+                hints.append("FEATURE ADDITION WITH UI ENHANCEMENT DETECTED:")
+                hints.append("• Feel free to improve the overall design")
+                hints.append("• Enhance user experience while adding the feature")
+                hints.append("• Make creative improvements")
+            else:
+                hints.append("FEATURE ADDITION DETECTED (MINIMAL CHANGE):")
+                hints.append("• Add ONLY the requested feature")
+                hints.append("• DO NOT change existing UI elements")
+                hints.append("• Integrate with minimal visual impact")
+                hints.append("• Preserve existing styles and layouts")
         
         # Bug fixes
         elif any(word in request_lower for word in ['fix', 'bug', 'error', 'crash', 'broken']):

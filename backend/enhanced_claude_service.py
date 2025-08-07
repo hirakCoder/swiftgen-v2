@@ -537,7 +537,7 @@ Return ONLY the app name, nothing else. No explanation or quotes."""
         if self.router:
             # Analyze modification to determine best LLM
             available_providers = [model.provider for model in self.available_models]
-            selected_provider = self.router.route_initial_request(modification, available_providers=available_providers)
+            selected_provider = self.router.route_initial_request(modification, available_providers=available_providers, is_modification=True)
             if selected_provider in self.models:
                 self.current_model = self.models[selected_provider]
                 logger.info(f"[ROUTER] Selected {self.current_model.name} for modification: {modification[:50]}...")
@@ -545,7 +545,7 @@ Return ONLY the app name, nothing else. No explanation or quotes."""
             # Create specialized prompt if router available
             strategy = "standard approach"
             if self.router:
-                request_type = self.router.analyze_request(modification)
+                request_type = self.router.analyze_request(modification, is_modification_context=True)
                 specialized_prompt = self.router.create_specialized_prompt(
                     self.current_model.provider,
                     strategy,
@@ -569,10 +569,14 @@ IMPORTANT RULES:
 6. If fixing "cannot find X in scope" errors, CREATE the missing file/type
 7. When creating new files, add them to the files array in your response
 
-CRITICAL iOS VERSION CONSTRAINTS:
-- Target iOS: 16.0
-- DO NOT use features only available in iOS 17.0 or newer:
-  * NO .symbolEffect() - use .scaleEffect or .opacity animations instead
+⚠️ CRITICAL iOS VERSION CONSTRAINTS - MUST FOLLOW:
+- Target iOS: 16.0 ONLY (NOT 17.0)
+- DO NOT use ANY iOS 17+ features:
+  * NO .symbolEffect() of any kind - use .scaleEffect or .rotationEffect instead
+  * NO .bounce animations - use .spring() instead
+  * NO iOS 17+ modifiers or APIs
+  * Always check feature availability before using
+- If you're unsure about iOS version, use the iOS 16 approach
   * NO .bounce effects - use .animation(.spring()) instead
   * NO @Observable macro - use ObservableObject + @Published
   * NO .scrollBounceBehavior modifier
@@ -660,7 +664,7 @@ IMPORTANT: The "changes_made" array must contain SPECIFIC, CONCRETE changes you 
             # Intelligent fallback for modifications
             if self.router and self.current_model:
                 self.failure_count[request_id] += 1
-                request_type = self.router.analyze_request(modification)
+                request_type = self.router.analyze_request(modification, is_modification_context=True)
                 
                 # Get fallback strategy
                 next_provider, strategy = self.router.get_fallback_strategy(
@@ -761,7 +765,7 @@ IMPORTANT: The "changes_made" array must contain SPECIFIC, CONCRETE changes you 
 
         # Record success if using router
         if self.router and isinstance(result, dict):
-            request_type = self.router.analyze_request(modification)
+            request_type = self.router.analyze_request(modification, is_modification_context=True)
             self.router.record_result(
                 self.current_model.provider,
                 request_type,

@@ -43,18 +43,24 @@ class SwiftErrorAutoFixer:
     def _initialize_patterns(self) -> List[ErrorPattern]:
         """Initialize error patterns with fix strategies"""
         return [
-            # Missing imports
+            # Missing imports - Updated patterns for actual Swift errors
             ErrorPattern(
-                pattern=r"cannot find type '(UIImpactFeedbackGenerator|UIKit\w+)' in scope",
+                pattern=r"cannot find type '(UIImpactFeedbackGenerator|UIKit\w+|UIDevice|UIApplication)' in scope",
                 error_type=ErrorType.MISSING_IMPORT,
-                fix_strategy="add_import",
+                fix_strategy="add_uikit_import",
                 description="Missing UIKit import"
             ),
             ErrorPattern(
-                pattern=r"cannot find '(\w+)' in scope.*SwiftUI",
+                pattern=r"cannot find type '(App|Scene|View|WindowGroup|NavigationView|NavigationStack)' in scope",
                 error_type=ErrorType.MISSING_IMPORT,
                 fix_strategy="add_swiftui_import",
-                description="Missing SwiftUI import"
+                description="Missing SwiftUI types"
+            ),
+            ErrorPattern(
+                pattern=r"cannot find '(Timer|Date|URL|URLSession|Data|JSONEncoder|JSONDecoder)' in scope",
+                error_type=ErrorType.MISSING_IMPORT,
+                fix_strategy="add_foundation_import",
+                description="Missing Foundation import"
             ),
             ErrorPattern(
                 pattern=r"no such module '(\w+)'",
@@ -143,10 +149,15 @@ class SwiftErrorAutoFixer:
         original_content = content
         
         # Apply fix based on strategy
-        if error.fix_strategy == "add_import":
+        if error.fix_strategy == "add_uikit_import":
             content = self._add_import(content, "UIKit")
         elif error.fix_strategy == "add_swiftui_import":
             content = self._add_import(content, "SwiftUI")
+        elif error.fix_strategy == "add_foundation_import":
+            content = self._add_import(content, "Foundation")
+        elif error.fix_strategy == "add_import":
+            # Legacy support
+            content = self._add_import(content, "UIKit")
         elif error.fix_strategy == "fix_swiftui_inheritance":
             content = self._fix_swiftui_inheritance(content)
         elif error.fix_strategy == "remove_duplicate":

@@ -29,7 +29,7 @@ sys.path.insert(0, str(backend_path))
 from core.pipeline import SwiftGenPipeline
 from core.circuit_breaker import CircuitBreakerError
 from generation.llm_router import LLMRouter
-from build.working_build import WorkingBuildService
+from build.direct_build import DirectBuildSystem
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -91,7 +91,7 @@ class ConnectionManager:
 # Initialize components
 manager = ConnectionManager()
 llm_router = LLMRouter()
-builder = WorkingBuildService()
+builder = DirectBuildSystem()
 pipeline = SwiftGenPipeline(llm_service=llm_router, build_service=builder)
 
 # Active projects tracking
@@ -106,6 +106,10 @@ if frontend_path.exists():
 @app.get("/")
 async def root():
     """Redirect to frontend"""
+    # Use the simple frontend that works with our proven API
+    simple_frontend = frontend_path / "simple.html"
+    if simple_frontend.exists():
+        return FileResponse(str(simple_frontend))
     return FileResponse(str(frontend_path / "index.html"))
 
 @app.get("/api")
@@ -147,19 +151,23 @@ async def modify_app(request: GenerateRequest):
                 error=f"No project found at {project_path}"
             )
         
-        # Route modification
+        # Route modification - use enhanced_service directly if available for better modification handling
+        llm_service = llm_router
+        if hasattr(llm_router, 'enhanced_service'):
+            llm_service = llm_router.enhanced_service
+            
         result = await IntelligentModificationRouter.route_modification(
             request=request.description,
             project_path=project_path,
-            llm_service=llm_router
+            llm_service=llm_service
         )
         
         if result['success']:
             print(f"[MODIFY] Files modified successfully, rebuilding {project_id}...")
             
             # Rebuild and relaunch the app with modifications
-            from build.working_build import WorkingBuildService
-            builder = WorkingBuildService()
+            from build.direct_build import DirectBuildSystem
+            builder = DirectBuildSystem()
             
             # Clean build directory first to ensure fresh build
             import shutil
@@ -203,6 +211,8 @@ async def modify_app(request: GenerateRequest):
             message="Modification error",
             error=str(e)
         )
+
+# Remove the problematic chat endpoint - frontend should use /api/generate directly
 
 @app.post("/api/generate", response_model=GenerateResponse)
 async def generate_app(request: GenerateRequest):
