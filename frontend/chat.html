@@ -128,6 +128,44 @@
             animation: pulse 2s infinite;
         }
         
+        /* Progress stage animation */
+        @keyframes progressPulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+            }
+        }
+        
+        .progress-active {
+            animation: progressPulse 2s infinite;
+        }
+        
+        /* Smooth progress bar */
+        .progress-bar {
+            transition: width 0.5s ease;
+        }
+        
+        /* App name input animation */
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .slide-down {
+            animation: slideDown 0.3s ease;
+        }
+        
         /* Thread hover effect */
         .thread-item:hover {
             background: rgba(59, 130, 246, 0.1);
@@ -274,6 +312,31 @@
             <!-- Input Area -->
             <div class="border-t border-gray-800 p-6">
                 <div class="max-w-4xl mx-auto">
+                    <!-- Optional App Name Input -->
+                    <div id="appNameContainer" class="hidden mb-3 slide-down">
+                        <div class="flex items-center gap-2">
+                            <div class="flex-1 relative">
+                                <input
+                                    id="appNameInput"
+                                    type="text"
+                                    placeholder="App name (optional, e.g., TodoMaster)"
+                                    class="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    maxlength="50"
+                                />
+                                <div class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">
+                                    <i class="fas fa-magic text-blue-400"></i> Auto-detected
+                                </div>
+                            </div>
+                            <button
+                                onclick="toggleAppNameInput()"
+                                class="p-2 text-gray-400 hover:text-gray-300"
+                                title="Close"
+                            >
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
                     <div class="relative">
                         <textarea
                             id="messageInput"
@@ -281,6 +344,7 @@
                             class="w-full bg-gray-800 rounded-xl px-4 py-3 pr-12 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                             rows="3"
                             onkeydown="handleKeyDown(event)"
+                            oninput="handleInputChange(event)"
                         ></textarea>
                         <button
                             id="sendButton"
@@ -293,6 +357,13 @@
                     <div class="flex items-center justify-between mt-3 text-xs text-gray-500">
                         <div class="flex items-center gap-4">
                             <span><kbd class="px-2 py-1 bg-gray-800 rounded">⌘</kbd> + <kbd class="px-2 py-1 bg-gray-800 rounded">Enter</kbd> to send</span>
+                            <button
+                                onclick="toggleAppNameInput()"
+                                class="flex items-center gap-1 hover:text-gray-300"
+                            >
+                                <i class="fas fa-tag"></i>
+                                <span id="appNameToggleText">Name app</span>
+                            </button>
                             <span id="connectionStatus" class="flex items-center gap-1">
                                 <div class="w-2 h-2 bg-green-400 rounded-full"></div>
                                 Connected
@@ -387,25 +458,64 @@
             console.log('WebSocket message:', data);
             
             if (data.type === 'status') {
-                // Show status as a system message in chat
-                addStatusMessage(data.message);
+                // Map WebSocket status to progress stages
+                const message = data.message.toLowerCase();
+                if (message.includes('generating') || message.includes('creating')) {
+                    updateProgressStage('generate', 'active', 'Generating Swift code...');
+                } else if (message.includes('building') || message.includes('compiling')) {
+                    updateProgressStage('generate', 'completed');
+                    updateProgressStage('build', 'active', 'Building with Xcode...');
+                } else if (message.includes('deploy') || message.includes('install')) {
+                    updateProgressStage('build', 'completed');
+                    updateProgressStage('deploy', 'active', 'Installing on simulator...');
+                } else if (message.includes('launch') || message.includes('running')) {
+                    updateProgressStage('deploy', 'completed');
+                    updateProgressStage('launch', 'active', 'Starting app...');
+                }
                 updateStatus(data.message);
             } else if (data.type === 'success') {
                 updateAppStatus('running');
-                addStatusMessage('✅ ' + (data.message || 'Operation completed successfully'));
+                // Don't complete progress here as it's handled in generateApp/modifyApp
             } else if (data.type === 'error') {
+                completeProgress(false);
                 showError(data.message);
                 hideTypingIndicator();
             } else if (data.type === 'files') {
                 updateFileList(data.files);
             } else if (data.message) {
-                // Generic message
-                addStatusMessage(data.message);
+                // Log generic messages
+                console.log('Generic message:', data.message);
             }
         }
         
-        // Add status message to chat
-        function addStatusMessage(message) {
+        // Progress tracking
+        let progressStages = [];
+        let currentStage = 0;
+        
+        // Initialize progress stages for generation
+        function initProgressStages(type = 'generation') {
+            if (type === 'generation') {
+                progressStages = [
+                    { id: 'analyze', label: 'Analyzing request', icon: '🤔', status: 'pending' },
+                    { id: 'generate', label: 'Generating code', icon: '✨', status: 'pending' },
+                    { id: 'build', label: 'Building app', icon: '🔨', status: 'pending' },
+                    { id: 'deploy', label: 'Deploying to simulator', icon: '📱', status: 'pending' },
+                    { id: 'launch', label: 'Launching app', icon: '🚀', status: 'pending' }
+                ];
+            } else if (type === 'modification') {
+                progressStages = [
+                    { id: 'analyze', label: 'Understanding changes', icon: '🔍', status: 'pending' },
+                    { id: 'modify', label: 'Modifying code', icon: '✏️', status: 'pending' },
+                    { id: 'rebuild', label: 'Rebuilding app', icon: '🔨', status: 'pending' },
+                    { id: 'reload', label: 'Reloading in simulator', icon: '🔄', status: 'pending' }
+                ];
+            }
+            currentStage = 0;
+            showProgressIndicator();
+        }
+        
+        // Show elegant progress indicator
+        function showProgressIndicator() {
             const messagesEl = document.getElementById('messages');
             
             // Clear welcome message if it exists
@@ -413,40 +523,191 @@
                 messagesEl.innerHTML = '';
             }
             
-            // Check if we already have a status container
-            let statusContainer = document.getElementById('statusMessages');
-            if (!statusContainer) {
-                statusContainer = document.createElement('div');
-                statusContainer.id = 'statusMessages';
-                statusContainer.className = 'bg-gray-800/30 rounded-xl p-3 mb-3';
-                statusContainer.innerHTML = '<div class="text-xs text-gray-400 mb-2">Build Progress</div>';
-                
-                // Simply append to messages container
-                messagesEl.appendChild(statusContainer);
+            // Remove existing progress if any
+            const existingProgress = document.getElementById('progressIndicator');
+            if (existingProgress) {
+                existingProgress.remove();
             }
             
-            // Add the new status message
-            const statusLine = document.createElement('div');
-            statusLine.className = 'text-sm text-gray-300 flex items-center gap-2';
+            // Create new progress indicator
+            const progressEl = document.createElement('div');
+            progressEl.id = 'progressIndicator';
+            progressEl.className = 'glass rounded-xl p-6 mb-4';
             
-            // Add appropriate icon based on message content
-            let icon = '🔄';
-            if (message.includes('✅') || message.includes('success') || message.includes('Success')) {
-                icon = '✅';
-            } else if (message.includes('error') || message.includes('Error') || message.includes('failed')) {
-                icon = '❌';
-            } else if (message.includes('Building') || message.includes('Compiling')) {
-                icon = '🔨';
-            } else if (message.includes('Launching') || message.includes('simulator')) {
-                icon = '📱';
-            }
+            // Progress header
+            const headerHtml = `
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-medium text-gray-300">Processing your request</h3>
+                    <div class="flex items-center gap-2 text-xs text-gray-500">
+                        <div class="w-2 h-2 bg-blue-400 rounded-full pulse"></div>
+                        <span id="progressTimer">0:00</span>
+                    </div>
+                </div>
+            `;
             
-            statusLine.innerHTML = `<span>${icon}</span><span>${escapeHtml(message)}</span>`;
-            statusContainer.appendChild(statusLine);
+            // Progress stages
+            const stagesHtml = progressStages.map((stage, index) => `
+                <div class="flex items-center gap-3 mb-3 stage-item" data-stage="${stage.id}">
+                    <div class="stage-icon w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-sm ${index === 0 ? 'progress-active bg-blue-600' : ''}">
+                        <span class="stage-emoji">${stage.icon}</span>
+                    </div>
+                    <div class="flex-1">
+                        <div class="text-sm stage-label ${index === 0 ? 'text-white' : 'text-gray-500'}">${stage.label}</div>
+                        <div class="stage-status text-xs text-gray-600 hidden"></div>
+                    </div>
+                    <div class="stage-check hidden">
+                        <i class="fas fa-check-circle text-green-400"></i>
+                    </div>
+                </div>
+            `).join('');
             
-            // Scroll to bottom
+            // Progress bar
+            const progressBarHtml = `
+                <div class="mt-4 bg-gray-800 rounded-full h-2 overflow-hidden">
+                    <div id="progressBar" class="progress-bar bg-gradient-to-r from-blue-500 to-purple-600 h-full rounded-full" style="width: 0%"></div>
+                </div>
+            `;
+            
+            progressEl.innerHTML = headerHtml + '<div class="space-y-1">' + stagesHtml + '</div>' + progressBarHtml;
+            messagesEl.appendChild(progressEl);
+            
+            // Start timer
+            startProgressTimer();
+            
+            // Scroll to view
             const container = document.getElementById('messagesContainer');
             container.scrollTop = container.scrollHeight;
+        }
+        
+        // Progress timer
+        let progressTimerInterval = null;
+        let progressStartTime = null;
+        
+        function startProgressTimer() {
+            progressStartTime = Date.now();
+            progressTimerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - progressStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                const timerEl = document.getElementById('progressTimer');
+                if (timerEl) {
+                    timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+        
+        function stopProgressTimer() {
+            if (progressTimerInterval) {
+                clearInterval(progressTimerInterval);
+                progressTimerInterval = null;
+            }
+        }
+        
+        // Update progress stage
+        function updateProgressStage(stageId, status = 'active', statusText = null) {
+            const stageIndex = progressStages.findIndex(s => s.id === stageId);
+            if (stageIndex === -1) return;
+            
+            // Update internal state
+            progressStages[stageIndex].status = status;
+            
+            // Update UI
+            const stageEl = document.querySelector(`[data-stage="${stageId}"]`);
+            if (!stageEl) return;
+            
+            const iconEl = stageEl.querySelector('.stage-icon');
+            const labelEl = stageEl.querySelector('.stage-label');
+            const checkEl = stageEl.querySelector('.stage-check');
+            const statusEl = stageEl.querySelector('.stage-status');
+            
+            // Remove previous states
+            iconEl.classList.remove('bg-gray-800', 'bg-blue-600', 'bg-green-600', 'bg-red-600', 'progress-active');
+            
+            if (status === 'active') {
+                iconEl.classList.add('bg-blue-600', 'progress-active');
+                labelEl.classList.remove('text-gray-500');
+                labelEl.classList.add('text-white');
+                checkEl.classList.add('hidden');
+            } else if (status === 'completed') {
+                iconEl.classList.add('bg-green-600');
+                labelEl.classList.remove('text-gray-500');
+                labelEl.classList.add('text-green-400');
+                checkEl.classList.remove('hidden');
+            } else if (status === 'error') {
+                iconEl.classList.add('bg-red-600');
+                labelEl.classList.remove('text-gray-500');
+                labelEl.classList.add('text-red-400');
+                checkEl.classList.add('hidden');
+            }
+            
+            // Update status text if provided
+            if (statusText && statusEl) {
+                statusEl.textContent = statusText;
+                statusEl.classList.remove('hidden');
+            }
+            
+            // Update progress bar
+            const progressBar = document.getElementById('progressBar');
+            if (progressBar) {
+                const completedCount = progressStages.filter(s => s.status === 'completed').length;
+                const progress = (completedCount / progressStages.length) * 100;
+                progressBar.style.width = `${progress}%`;
+            }
+        }
+        
+        // Complete all progress
+        function completeProgress(success = true) {
+            stopProgressTimer();
+            
+            // Mark all stages as completed or error
+            progressStages.forEach(stage => {
+                if (stage.status !== 'completed') {
+                    updateProgressStage(stage.id, success ? 'completed' : 'error');
+                }
+            });
+            
+            // Update progress bar
+            const progressBar = document.getElementById('progressBar');
+            if (progressBar) {
+                progressBar.style.width = '100%';
+            }
+            
+            // Remove progress indicator after a delay
+            setTimeout(() => {
+                const progressEl = document.getElementById('progressIndicator');
+                if (progressEl) {
+                    progressEl.style.opacity = '0';
+                    setTimeout(() => progressEl.remove(), 300);
+                }
+            }, success ? 2000 : 5000);
+        }
+        
+        // Add status message to chat (simplified version for backward compatibility)
+        function addStatusMessage(message) {
+            // Map messages to progress stages
+            if (message.includes('Starting app generation')) {
+                initProgressStages('generation');
+                updateProgressStage('analyze', 'active');
+            } else if (message.includes('Processing your request')) {
+                updateProgressStage('analyze', 'completed');
+                updateProgressStage('generate', 'active');
+            } else if (message.includes('Building') || message.includes('Compiling')) {
+                updateProgressStage('generate', 'completed');
+                updateProgressStage('build', 'active');
+            } else if (message.includes('Deploying') || message.includes('Installing')) {
+                updateProgressStage('build', 'completed');
+                updateProgressStage('deploy', 'active');
+            } else if (message.includes('Launching') || message.includes('Opening')) {
+                updateProgressStage('deploy', 'completed');
+                updateProgressStage('launch', 'active');
+            } else if (message.includes('✅') && message.includes('success')) {
+                completeProgress(true);
+            } else if (message.includes('❌') || message.includes('error') || message.includes('failed')) {
+                completeProgress(false);
+            }
+            
+            // Still log to console for debugging
+            console.log('Status:', message);
         }
         
         // Thread Management
@@ -576,15 +837,26 @@
         }
         
         async function generateApp(description) {
-            // Extract app name from description or generate one
-            const appName = extractAppName(description) || `App${Date.now()}`;
+            // Check if user provided a custom app name
+            const appNameInput = document.getElementById('appNameInput');
+            let appName = appNameInput && appNameInput.value.trim();
+            
+            // If no custom name, extract from description
+            if (!appName) {
+                appName = extractAppName(description) || `App${Date.now()}`;
+            }
+            
+            // Ensure app name ends with 'App' if it doesn't already
+            if (!appName.endsWith('App')) {
+                appName = appName + 'App';
+            }
             
             console.log('Description:', description);
-            console.log('Extracted app name:', appName);
+            console.log('App name:', appName);
             
-            // Show initial status
-            addStatusMessage('🚀 Starting app generation...');
-            addStatusMessage('📝 Processing your request: ' + appName);
+            // Initialize progress stages
+            initProgressStages('generation');
+            updateProgressStage('analyze', 'active', 'Understanding your requirements...');
             
             // Use longer timeout for generation
             const controller = new AbortController();
@@ -618,6 +890,13 @@
             }
             
             if (result && result.success) {
+                // Update progress
+                updateProgressStage('analyze', 'completed', 'Requirements analyzed');
+                updateProgressStage('generate', 'completed', 'Code generated');
+                updateProgressStage('build', 'completed', 'App built successfully');
+                updateProgressStage('deploy', 'completed', 'Deployed to simulator');
+                updateProgressStage('launch', 'completed', 'App launched');
+                
                 currentProjectId = result.project_id;
                 currentAppName = appName;
                 
@@ -637,6 +916,9 @@
                     setupWebSocket(currentProjectId);
                 }
                 
+                // Complete progress successfully
+                completeProgress(true);
+                
                 // Add AI response
                 const aiMessage = `✅ Successfully created ${appName}!\n\nYour app is now running in the iOS Simulator. You can modify it by describing what changes you'd like.`;
                 addMessageToUI(aiMessage, 'assistant', true);
@@ -647,11 +929,19 @@
                 updateAppStatus('running');
                 document.getElementById('currentAppName').textContent = appName;
                 
+                // Clear app name input
+                const appNameInput = document.getElementById('appNameInput');
+                if (appNameInput) {
+                    appNameInput.value = '';
+                }
+                hideAppNameInput();
+                
                 // Show files if available
                 if (result.files) {
                     updateFileList(result.files);
                 }
             } else {
+                completeProgress(false);
                 throw new Error(result.error || 'Failed to generate app');
             }
         }
@@ -662,6 +952,10 @@
             if (!currentProjectId || !currentAppName) {
                 throw new Error('No active project to modify. Please generate an app first.');
             }
+            
+            // Initialize progress stages for modification
+            initProgressStages('modification');
+            updateProgressStage('analyze', 'active', 'Analyzing requested changes...');
             
             // Use longer timeout for modification
             const controller = new AbortController();
@@ -687,6 +981,15 @@
             const result = await response.json();
             
             if (result.success) {
+                // Update progress
+                updateProgressStage('analyze', 'completed', 'Changes understood');
+                updateProgressStage('modify', 'completed', 'Code modified');
+                updateProgressStage('rebuild', 'completed', 'App rebuilt');
+                updateProgressStage('reload', 'completed', 'Reloaded in simulator');
+                
+                // Complete progress successfully
+                completeProgress(true);
+                
                 // Add AI response
                 const aiMessage = `✅ Successfully modified ${currentAppName}!\n\nThe changes have been applied and the app has been reloaded in the simulator.`;
                 addMessageToUI(aiMessage, 'assistant', true);
@@ -698,6 +1001,7 @@
                     updateFileList(result.files);
                 }
             } else {
+                completeProgress(false);
                 throw new Error(result.error || 'Failed to modify app');
             }
         }
@@ -843,14 +1147,64 @@
             sendMessage();
         }
         
+        // App name input handling
+        function toggleAppNameInput() {
+            const container = document.getElementById('appNameContainer');
+            const toggleText = document.getElementById('appNameToggleText');
+            
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                toggleText.textContent = 'Hide name';
+                document.getElementById('appNameInput').focus();
+            } else {
+                container.classList.add('hidden');
+                toggleText.textContent = 'Name app';
+            }
+        }
+        
+        function hideAppNameInput() {
+            const container = document.getElementById('appNameContainer');
+            const toggleText = document.getElementById('appNameToggleText');
+            container.classList.add('hidden');
+            toggleText.textContent = 'Name app';
+        }
+        
+        function handleInputChange(event) {
+            updateCharCount();
+            autoResize();
+            
+            // Show app name input on first message if not a modification
+            if (!currentProjectId && event.target.value.length > 0) {
+                const container = document.getElementById('appNameContainer');
+                if (container.classList.contains('hidden')) {
+                    // Auto-detect app name and show in input as placeholder
+                    const detectedName = extractAppName(event.target.value);
+                    const appNameInput = document.getElementById('appNameInput');
+                    if (detectedName && detectedName !== 'MyApp' + Date.now()) {
+                        appNameInput.placeholder = `App name (auto-detected: ${detectedName})`;
+                    }
+                }
+            }
+        }
+        
         // Input Handlers
         function setupInputListeners() {
             const input = document.getElementById('messageInput');
             
             input.addEventListener('input', () => {
-                updateCharCount();
-                autoResize();
+                handleInputChange({ target: input });
             });
+            
+            // App name input enter key handler
+            const appNameInput = document.getElementById('appNameInput');
+            if (appNameInput) {
+                appNameInput.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        document.getElementById('messageInput').focus();
+                    }
+                });
+            }
         }
         
         function handleKeyDown(event) {

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Extract</title>
+</head>
+<body>
+    <h1>Test App Name Extraction</h1>
+    <div id="results"></div>
+    
+    <script>
+        function extractAppName(description) {
+            // Generate a default name based on description keywords FIRST
+            const keywords = ['timer', 'todo', 'weather', 'calculator', 'counter', 'notes', 'chat', 'list'];
+            const descLower = description.toLowerCase();
+            
+            for (const keyword of keywords) {
+                if (descLower.includes(keyword)) {
+                    // Clean up the name - remove spaces and capitalize
+                    const baseName = keyword.charAt(0).toUpperCase() + keyword.slice(1);
+                    return baseName + 'App';
+                }
+            }
+            
+            // If no keyword found, try to extract from patterns
+            const patterns = [
+                /(?:called?|named?)\s+(\w+)/i,
+                /(?:create|build|make)\s+(?:a|an)\s+(\w+)/i
+            ];
+            
+            for (const pattern of patterns) {
+                const match = description.match(pattern);
+                if (match && match[1] && match[1].length > 2) {
+                    // Capitalize first letter and add App suffix
+                    const name = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+                    return name.includes('App') ? name : name + 'App';
+                }
+            }
+            
+            // Fallback to timestamp-based name
+            return 'MyApp' + Date.now();
+        }
+        
+        // Test cases
+        const tests = [
+            "Create a todo list app with categories",
+            "Create a simple timer",
+            "Build a weather app",
+            "Make a calculator"
+        ];
+        
+        const results = document.getElementById('results');
+        tests.forEach(test => {
+            const result = extractAppName(test);
+            results.innerHTML += `<p>"${test}" → "${result}"</p>`;
+        });
+    </script>
+</body>
+</html>
