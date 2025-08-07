@@ -41,6 +41,10 @@ server.log
 .env
 *.cache
 build_cache/
+# Allow build directory but not build artifacts
+!build/
+build/*.app
+build/*.dSYM
 
 # Xcode
 *.xcodeproj
