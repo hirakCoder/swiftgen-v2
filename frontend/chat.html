@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwiftGen - AI iOS App Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-swift.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #4B5563;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6B7280;
+        }
+        
+        /* Smooth animations */
+        * {
+            transition: all 0.2s ease;
+        }
+        
+        /* Typing indicator animation */
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.5;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+        
+        .typing-dot {
+            animation: typing 1.4s infinite;
+        }
+        
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        /* Message animations */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message-enter {
+            animation: slideIn 0.3s ease forwards;
+        }
+        
+        /* Glow effect for active elements */
+        .glow {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* Gradient text */
+        .gradient-text {
+            background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* Glass morphism effect */
+        .glass {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Code block styling */
+        .code-block {
+            background: #1e1e1e !important;
+            border-radius: 8px;
+            padding: 16px !important;
+            margin: 8px 0;
+            overflow-x: auto;
+        }
+        
+        pre[class*="language-"] {
+            margin: 0 !important;
+            background: transparent !important;
+        }
+        
+        /* Status indicator pulse */
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        /* Thread hover effect */
+        .thread-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 3px solid #3B82F6;
+            padding-left: 13px;
+        }
+        
+        /* Loading shimmer effect */
+        @keyframes shimmer {
+            0% {
+                background-position: -1000px 0;
+            }
+            100% {
+                background-position: 1000px 0;
+            }
+        }
+        
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            background-size: 1000px 100%;
+            animation: shimmer 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 h-screen overflow-hidden">
+    <!-- Main Container -->
+    <div class="flex h-full">
+        <!-- Sidebar - Thread History -->
+        <div class="w-80 glass border-r border-gray-800 flex flex-col">
+            <!-- Logo & New Chat -->
+            <div class="p-6 border-b border-gray-800">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-cube text-white"></i>
+                        </div>
+                        <h1 class="text-xl font-semibold">SwiftGen</h1>
+                    </div>
+                    <button onclick="newThread()" class="p-2 hover:bg-gray-800 rounded-lg transition-colors">
+                        <i class="fas fa-plus text-gray-400"></i>
+                    </button>
+                </div>
+                
+                <button onclick="newThread()" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 rounded-xl font-medium flex items-center justify-center gap-2 glow">
+                    <i class="fas fa-message"></i>
+                    New App
+                </button>
+            </div>
+            
+            <!-- Thread List -->
+            <div class="flex-1 overflow-y-auto p-4">
+                <div class="text-xs text-gray-500 uppercase tracking-wider mb-3 px-2">Recent</div>
+                <div id="threadList" class="space-y-1">
+                    <!-- Threads will be added here dynamically -->
+                </div>
+            </div>
+            
+            <!-- User Profile -->
+            <div class="p-4 border-t border-gray-800">
+                <div class="flex items-center gap-3 p-2 hover:bg-gray-800 rounded-lg cursor-pointer">
+                    <div class="w-8 h-8 bg-gradient-to-br from-green-500 to-blue-600 rounded-full"></div>
+                    <div class="flex-1">
+                        <div class="text-sm font-medium">User</div>
+                        <div class="text-xs text-gray-500">Free Plan</div>
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-500 text-xs"></i>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Chat Area -->
+        <div class="flex-1 flex flex-col">
+            <!-- Header -->
+            <div class="glass border-b border-gray-800 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <h2 id="currentAppName" class="text-lg font-semibold">New App</h2>
+                        <div id="appStatus" class="hidden items-center gap-2 px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm">
+                            <div class="w-2 h-2 bg-green-400 rounded-full pulse"></div>
+                            <span>Running</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="viewCode()" class="px-4 py-2 hover:bg-gray-800 rounded-lg flex items-center gap-2 text-sm">
+                            <i class="fas fa-code"></i>
+                            View Code
+                        </button>
+                        <button onclick="openSimulator()" class="px-4 py-2 hover:bg-gray-800 rounded-lg flex items-center gap-2 text-sm">
+                            <i class="fas fa-mobile-alt"></i>
+                            Simulator
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Messages Container -->
+            <div id="messagesContainer" class="flex-1 overflow-y-auto p-6">
+                <div id="messages" class="max-w-4xl mx-auto space-y-6">
+                    <!-- Welcome Message -->
+                    <div class="text-center py-12">
+                        <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <i class="fas fa-rocket text-white text-3xl"></i>
+                        </div>
+                        <h2 class="text-2xl font-semibold mb-2 gradient-text">Build your iOS app with AI</h2>
+                        <p class="text-gray-400 mb-8">Describe your app idea and I'll build it for you instantly</p>
+                        
+                        <!-- Quick Start Templates -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
+                            <button onclick="quickStart('Create a todo list app with categories')" class="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-left">
+                                <i class="fas fa-tasks text-blue-400 mb-2"></i>
+                                <div class="text-sm font-medium">Todo App</div>
+                            </button>
+                            <button onclick="quickStart('Build a weather app with current conditions')" class="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-left">
+                                <i class="fas fa-cloud-sun text-yellow-400 mb-2"></i>
+                                <div class="text-sm font-medium">Weather</div>
+                            </button>
+                            <button onclick="quickStart('Create a timer app with multiple timers')" class="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-left">
+                                <i class="fas fa-stopwatch text-green-400 mb-2"></i>
+                                <div class="text-sm font-medium">Timer</div>
+                            </button>
+                            <button onclick="quickStart('Build a calculator app with history')" class="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-left">
+                                <i class="fas fa-calculator text-purple-400 mb-2"></i>
+                                <div class="text-sm font-medium">Calculator</div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Typing Indicator (Hidden by default) -->
+                <div id="typingIndicator" class="hidden max-w-4xl mx-auto">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                            <i class="fas fa-robot text-white text-sm"></i>
+                        </div>
+                        <div class="bg-gray-800 rounded-2xl px-4 py-3 flex gap-1">
+                            <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                            <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                            <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Input Area -->
+            <div class="border-t border-gray-800 p-6">
+                <div class="max-w-4xl mx-auto">
+                    <div class="relative">
+                        <textarea
+                            id="messageInput"
+                            placeholder="Describe your iOS app or modification..."
+                            class="w-full bg-gray-800 rounded-xl px-4 py-3 pr-12 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            rows="3"
+                            onkeydown="handleKeyDown(event)"
+                        ></textarea>
+                        <button
+                            id="sendButton"
+                            onclick="sendMessage()"
+                            class="absolute bottom-3 right-3 w-8 h-8 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <i class="fas fa-paper-plane text-white text-sm"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between mt-3 text-xs text-gray-500">
+                        <div class="flex items-center gap-4">
+                            <span><kbd class="px-2 py-1 bg-gray-800 rounded">⌘</kbd> + <kbd class="px-2 py-1 bg-gray-800 rounded">Enter</kbd> to send</span>
+                            <span id="connectionStatus" class="flex items-center gap-1">
+                                <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                                Connected
+                            </span>
+                        </div>
+                        <div id="charCount">0 / 2000</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Code Panel (Hidden by default) -->
+        <div id="codePanel" class="hidden w-96 glass border-l border-gray-800 flex flex-col">
+            <div class="p-4 border-b border-gray-800 flex items-center justify-between">
+                <h3 class="font-semibold">Project Files</h3>
+                <button onclick="closeCodePanel()" class="p-1 hover:bg-gray-800 rounded">
+                    <i class="fas fa-times text-gray-400"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4">
+                <div id="fileList" class="space-y-2">
+                    <!-- Files will be listed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // State Management
+        let currentThread = null;
+        let threads = JSON.parse(localStorage.getItem('swiftgen_threads') || '[]');
+        let ws = null;
+        let currentProjectId = null;
+        let currentAppName = null;
+        let isGenerating = false;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadThreads();
+            // Don't setup WebSocket until we have a project ID
+            setupInputListeners();
+            
+            // Start new thread if no threads exist
+            if (threads.length === 0) {
+                newThread();
+            } else {
+                // Just load the thread - loadThread will handle WebSocket setup
+                loadThread(threads[0].id);
+            }
+        });
+        
+        // WebSocket Setup
+        function setupWebSocket(projectId) {
+            // Close existing connection if any
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            
+            // Only create new WebSocket if projectId is provided
+            if (!projectId) {
+                console.log('No project ID for WebSocket');
+                return;
+            }
+            
+            const wsUrl = `ws://localhost:8000/ws/${projectId}`;
+            console.log('Setting up WebSocket:', wsUrl);
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                updateConnectionStatus(true);
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+            
+            ws.onclose = () => {
+                updateConnectionStatus(false);
+                // Don't auto-reconnect - let user actions trigger reconnection
+                ws = null;
+            };
+            
+            ws.onerror = () => {
+                updateConnectionStatus(false);
+            };
+        }
+        
+        // Handle WebSocket Messages
+        function handleWebSocketMessage(data) {
+            console.log('WebSocket message:', data);
+            
+            if (data.type === 'status') {
+                // Show status as a system message in chat
+                addStatusMessage(data.message);
+                updateStatus(data.message);
+            } else if (data.type === 'success') {
+                updateAppStatus('running');
+                addStatusMessage('✅ ' + (data.message || 'Operation completed successfully'));
+            } else if (data.type === 'error') {
+                showError(data.message);
+                hideTypingIndicator();
+            } else if (data.type === 'files') {
+                updateFileList(data.files);
+            } else if (data.message) {
+                // Generic message
+                addStatusMessage(data.message);
+            }
+        }
+        
+        // Add status message to chat
+        function addStatusMessage(message) {
+            const messagesEl = document.getElementById('messages');
+            
+            // Clear welcome message if it exists
+            if (messagesEl.querySelector('.text-center')) {
+                messagesEl.innerHTML = '';
+            }
+            
+            // Check if we already have a status container
+            let statusContainer = document.getElementById('statusMessages');
+            if (!statusContainer) {
+                statusContainer = document.createElement('div');
+                statusContainer.id = 'statusMessages';
+                statusContainer.className = 'bg-gray-800/30 rounded-xl p-3 mb-3';
+                statusContainer.innerHTML = '<div class="text-xs text-gray-400 mb-2">Build Progress</div>';
+                
+                // Simply append to messages container
+                messagesEl.appendChild(statusContainer);
+            }
+            
+            // Add the new status message
+            const statusLine = document.createElement('div');
+            statusLine.className = 'text-sm text-gray-300 flex items-center gap-2';
+            
+            // Add appropriate icon based on message content
+            let icon = '🔄';
+            if (message.includes('✅') || message.includes('success') || message.includes('Success')) {
+                icon = '✅';
+            } else if (message.includes('error') || message.includes('Error') || message.includes('failed')) {
+                icon = '❌';
+            } else if (message.includes('Building') || message.includes('Compiling')) {
+                icon = '🔨';
+            } else if (message.includes('Launching') || message.includes('simulator')) {
+                icon = '📱';
+            }
+            
+            statusLine.innerHTML = `<span>${icon}</span><span>${escapeHtml(message)}</span>`;
+            statusContainer.appendChild(statusLine);
+            
+            // Scroll to bottom
+            const container = document.getElementById('messagesContainer');
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        // Thread Management
+        function newThread() {
+            const thread = {
+                id: generateId(),
+                title: 'New App',
+                messages: [],
+                createdAt: new Date().toISOString(),
+                projectId: null,
+                appName: null
+            };
+            
+            threads.unshift(thread);
+            saveThreads();
+            loadThread(thread.id);
+            loadThreads();
+        }
+        
+        function loadThread(threadId) {
+            currentThread = threads.find(t => t.id === threadId);
+            if (!currentThread) return;
+            
+            // IMPORTANT: Restore project ID and app name from thread
+            currentProjectId = currentThread.projectId || null;
+            currentAppName = currentThread.appName || null;
+            
+            console.log('Loading thread:', threadId, 'Project ID:', currentProjectId, 'App Name:', currentAppName);
+            
+            // Update UI
+            document.getElementById('currentAppName').textContent = currentThread.title;
+            
+            // Load messages
+            const messagesEl = document.getElementById('messages');
+            messagesEl.innerHTML = '';
+            
+            if (currentThread.messages.length === 0) {
+                // Show welcome message
+                messagesEl.innerHTML = getWelcomeMessage();
+            } else {
+                currentThread.messages.forEach(msg => {
+                    addMessageToUI(msg.content, msg.role, false);
+                });
+            }
+            
+            // Update thread list selection
+            document.querySelectorAll('.thread-item').forEach(el => {
+                el.classList.remove('bg-gray-800', 'border-blue-500');
+                if (el.dataset.threadId === threadId) {
+                    el.classList.add('bg-gray-800', 'border-blue-500');
+                }
+            });
+            
+            // Setup WebSocket if project exists (but only if we don't already have one)
+            if (currentProjectId && !ws) {
+                setupWebSocket(currentProjectId);
+                updateAppStatus('running');
+            }
+        }
+        
+        function loadThreads() {
+            const threadListEl = document.getElementById('threadList');
+            threadListEl.innerHTML = '';
+            
+            threads.forEach(thread => {
+                const threadEl = document.createElement('div');
+                threadEl.className = 'thread-item p-3 hover:bg-gray-800 rounded-lg cursor-pointer border-l-2 border-transparent transition-all';
+                threadEl.dataset.threadId = thread.id;
+                threadEl.onclick = () => loadThread(thread.id);
+                
+                const timeAgo = getTimeAgo(thread.createdAt);
+                
+                threadEl.innerHTML = `
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="font-medium text-sm">${thread.title}</div>
+                            <div class="text-xs text-gray-500 mt-1">${timeAgo}</div>
+                        </div>
+                        ${thread.projectId ? '<i class="fas fa-check-circle text-green-400 text-xs"></i>' : ''}
+                    </div>
+                `;
+                
+                threadListEl.appendChild(threadEl);
+            });
+        }
+        
+        function saveThreads() {
+            localStorage.setItem('swiftgen_threads', JSON.stringify(threads));
+        }
+        
+        // Message Handling
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message || isGenerating) return;
+            
+            // Add user message
+            addMessageToUI(message, 'user', true);
+            currentThread.messages.push({ role: 'user', content: message });
+            saveThreads();
+            
+            // Clear input
+            input.value = '';
+            updateCharCount();
+            
+            // Show typing indicator
+            showTypingIndicator();
+            isGenerating = true;
+            document.getElementById('sendButton').disabled = true;
+            
+            try {
+                if (!currentProjectId) {
+                    // First message - generate app
+                    await generateApp(message);
+                } else {
+                    // Subsequent messages - modify app
+                    await modifyApp(message);
+                }
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                hideTypingIndicator();
+                isGenerating = false;
+                document.getElementById('sendButton').disabled = false;
+            }
+        }
+        
+        async function generateApp(description) {
+            // Extract app name from description or generate one
+            const appName = extractAppName(description) || `App${Date.now()}`;
+            
+            console.log('Description:', description);
+            console.log('Extracted app name:', appName);
+            
+            // Show initial status
+            addStatusMessage('🚀 Starting app generation...');
+            addStatusMessage('📝 Processing your request: ' + appName);
+            
+            // Use longer timeout for generation
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+            
+            let result;
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        description: description,
+                        app_name: appName
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                result = await response.json();
+            } catch (error) {
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    throw new Error('Request timeout - this is taking longer than expected. Please try again.');
+                }
+                throw error;
+            }
+            
+            if (result && result.success) {
+                currentProjectId = result.project_id;
+                currentAppName = appName;
+                
+                // IMPORTANT: Save to thread for persistence
+                currentThread.projectId = currentProjectId;
+                currentThread.appName = currentAppName;
+                currentThread.title = appName;
+                
+                // Save immediately to localStorage
+                saveThreads();
+                
+                // Reload thread list UI
+                loadThreads();
+                
+                // Setup WebSocket with project ID for live updates (only if not already connected)
+                if (!ws) {
+                    setupWebSocket(currentProjectId);
+                }
+                
+                // Add AI response
+                const aiMessage = `✅ Successfully created ${appName}!\n\nYour app is now running in the iOS Simulator. You can modify it by describing what changes you'd like.`;
+                addMessageToUI(aiMessage, 'assistant', true);
+                currentThread.messages.push({ role: 'assistant', content: aiMessage });
+                saveThreads();
+                
+                // Update status
+                updateAppStatus('running');
+                document.getElementById('currentAppName').textContent = appName;
+                
+                // Show files if available
+                if (result.files) {
+                    updateFileList(result.files);
+                }
+            } else {
+                throw new Error(result.error || 'Failed to generate app');
+            }
+        }
+        
+        async function modifyApp(description) {
+            console.log('Modifying app:', currentAppName, 'Project ID:', currentProjectId);
+            
+            if (!currentProjectId || !currentAppName) {
+                throw new Error('No active project to modify. Please generate an app first.');
+            }
+            
+            // Use longer timeout for modification
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+            
+            const requestBody = {
+                description: description,
+                app_name: currentAppName,
+                project_id: currentProjectId
+            };
+            
+            console.log('Sending modification request:', requestBody);
+            
+            const response = await fetch('/api/modify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody),
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Add AI response
+                const aiMessage = `✅ Successfully modified ${currentAppName}!\n\nThe changes have been applied and the app has been reloaded in the simulator.`;
+                addMessageToUI(aiMessage, 'assistant', true);
+                currentThread.messages.push({ role: 'assistant', content: aiMessage });
+                saveThreads();
+                
+                // Update files if available
+                if (result.files) {
+                    updateFileList(result.files);
+                }
+            } else {
+                throw new Error(result.error || 'Failed to modify app');
+            }
+        }
+        
+        function addMessageToUI(content, role, animate = true) {
+            const messagesEl = document.getElementById('messages');
+            
+            // Clear welcome message if it exists
+            if (messagesEl.querySelector('.text-center')) {
+                messagesEl.innerHTML = '';
+            }
+            
+            const messageEl = document.createElement('div');
+            messageEl.className = `flex items-start gap-3 ${animate ? 'message-enter' : ''}`;
+            
+            if (role === 'user') {
+                messageEl.innerHTML = `
+                    <div class="w-8 h-8 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex-shrink-0"></div>
+                    <div class="flex-1">
+                        <div class="bg-gray-800 rounded-2xl px-4 py-3">
+                            <div class="whitespace-pre-wrap">${escapeHtml(content)}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                messageEl.innerHTML = `
+                    <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-robot text-white text-sm"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="bg-gray-800/50 rounded-2xl px-4 py-3">
+                            <div class="whitespace-pre-wrap">${formatAIMessage(content)}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            messagesEl.appendChild(messageEl);
+            
+            // Scroll to bottom
+            const container = document.getElementById('messagesContainer');
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        // UI Updates
+        function showTypingIndicator() {
+            document.getElementById('typingIndicator').classList.remove('hidden');
+            const container = document.getElementById('messagesContainer');
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function hideTypingIndicator() {
+            document.getElementById('typingIndicator').classList.add('hidden');
+        }
+        
+        function updateAppStatus(status) {
+            const statusEl = document.getElementById('appStatus');
+            statusEl.classList.remove('hidden');
+            statusEl.classList.add('flex');
+            
+            if (status === 'running') {
+                statusEl.innerHTML = `
+                    <div class="w-2 h-2 bg-green-400 rounded-full pulse"></div>
+                    <span>Running</span>
+                `;
+                statusEl.className = statusEl.className.replace('bg-yellow-500/20 text-yellow-400', 'bg-green-500/20 text-green-400');
+            } else if (status === 'building') {
+                statusEl.innerHTML = `
+                    <div class="w-2 h-2 bg-yellow-400 rounded-full pulse"></div>
+                    <span>Building</span>
+                `;
+                statusEl.className = statusEl.className.replace('bg-green-500/20 text-green-400', 'bg-yellow-500/20 text-yellow-400');
+            }
+        }
+        
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('connectionStatus');
+            if (connected) {
+                statusEl.innerHTML = `
+                    <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                    Connected
+                `;
+            } else {
+                statusEl.innerHTML = `
+                    <div class="w-2 h-2 bg-red-400 rounded-full"></div>
+                    Disconnected
+                `;
+            }
+        }
+        
+        function updateStatus(message) {
+            // Update the app status indicator
+            const statusEl = document.getElementById('appStatus');
+            if (message.toLowerCase().includes('build') || message.toLowerCase().includes('compil')) {
+                updateAppStatus('building');
+            }
+            console.log('Status:', message);
+        }
+        
+        function showError(message) {
+            const aiMessage = `❌ Error: ${message}\n\nPlease try again or describe the issue differently.`;
+            addMessageToUI(aiMessage, 'assistant', true);
+        }
+        
+        // File Management
+        function viewCode() {
+            const panel = document.getElementById('codePanel');
+            panel.classList.toggle('hidden');
+        }
+        
+        function closeCodePanel() {
+            document.getElementById('codePanel').classList.add('hidden');
+        }
+        
+        function updateFileList(files) {
+            const fileListEl = document.getElementById('fileList');
+            fileListEl.innerHTML = '';
+            
+            files.forEach(file => {
+                const fileEl = document.createElement('div');
+                fileEl.className = 'p-3 bg-gray-800 hover:bg-gray-700 rounded-lg cursor-pointer';
+                fileEl.onclick = () => viewFile(file);
+                
+                fileEl.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-file-code text-blue-400"></i>
+                        <span class="text-sm">${file.path || file.name}</span>
+                    </div>
+                `;
+                
+                fileListEl.appendChild(fileEl);
+            });
+        }
+        
+        function viewFile(file) {
+            // Could open a modal or expand to show file contents
+            console.log('View file:', file);
+        }
+        
+        // Quick Start Templates
+        function quickStart(description) {
+            document.getElementById('messageInput').value = description;
+            sendMessage();
+        }
+        
+        // Input Handlers
+        function setupInputListeners() {
+            const input = document.getElementById('messageInput');
+            
+            input.addEventListener('input', () => {
+                updateCharCount();
+                autoResize();
+            });
+        }
+        
+        function handleKeyDown(event) {
+            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+        
+        function updateCharCount() {
+            const input = document.getElementById('messageInput');
+            const count = input.value.length;
+            document.getElementById('charCount').textContent = `${count} / 2000`;
+        }
+        
+        function autoResize() {
+            const input = document.getElementById('messageInput');
+            input.style.height = 'auto';
+            input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+        }
+        
+        // Utility Functions
+        function generateId() {
+            return Math.random().toString(36).substring(2) + Date.now().toString(36);
+        }
+        
+        function generateClientId() {
+            return 'client_' + generateId();
+        }
+        
+        function extractAppName(description) {
+            // Generate a default name based on description keywords FIRST
+            const keywords = ['timer', 'todo', 'weather', 'calculator', 'counter', 'notes', 'chat', 'list'];
+            const descLower = description.toLowerCase();
+            
+            for (const keyword of keywords) {
+                if (descLower.includes(keyword)) {
+                    // Clean up the name - remove spaces and capitalize
+                    const baseName = keyword.charAt(0).toUpperCase() + keyword.slice(1);
+                    return baseName + 'App';
+                }
+            }
+            
+            // If no keyword found, try to extract from patterns
+            const patterns = [
+                /(?:called?|named?)\s+(\w+)/i,
+                /(?:create|build|make)\s+(?:a|an)\s+(\w+)/i
+            ];
+            
+            for (const pattern of patterns) {
+                const match = description.match(pattern);
+                if (match && match[1] && match[1].length > 2) {
+                    // Capitalize first letter and add App suffix
+                    const name = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+                    return name.includes('App') ? name : name + 'App';
+                }
+            }
+            
+            // Fallback to timestamp-based name
+            return 'MyApp' + Date.now();
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function formatAIMessage(content) {
+            // Format AI messages with better styling
+            return content
+                .replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+                    return `<pre class="code-block"><code class="language-${lang || 'swift'}">${escapeHtml(code.trim())}</code></pre>`;
+                })
+                .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 bg-gray-700 rounded text-blue-400">$1</code>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+        }
+        
+        function getTimeAgo(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const seconds = Math.floor((now - date) / 1000);
+            
+            if (seconds < 60) return 'just now';
+            if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+            if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+            if (seconds < 604800) return Math.floor(seconds / 86400) + 'd ago';
+            return date.toLocaleDateString();
+        }
+        
+        function getWelcomeMessage() {
+            return `
+                <div class="text-center py-12">
+                    <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-rocket text-white text-3xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-semibold mb-2 gradient-text">Build your iOS app with AI</h2>
+                    <p class="text-gray-400 mb-8">Describe your app idea and I'll build it for you instantly</p>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
+                        <button onclick="quickStart('Create a todo list app with categories')" class="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-left">
+                            <i class="fas fa-tasks text-blue-400 mb-2"></i>
+                            <div class="text-sm font-medium">Todo App</div>
+                        </button>
+                        <button onclick="quickStart('Build a weather app with current conditions')" class="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-left">
+                            <i class="fas fa-cloud-sun text-yellow-400 mb-2"></i>
+                            <div class="text-sm font-medium">Weather</div>
+                        </button>
+                        <button onclick="quickStart('Create a timer app with multiple timers')" class="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-left">
+                            <i class="fas fa-stopwatch text-green-400 mb-2"></i>
+                            <div class="text-sm font-medium">Timer</div>
+                        </button>
+                        <button onclick="quickStart('Build a calculator app with history')" class="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-left">
+                            <i class="fas fa-calculator text-purple-400 mb-2"></i>
+                            <div class="text-sm font-medium">Calculator</div>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Open simulator
+        function openSimulator() {
+            // This would trigger opening the simulator or show instructions
+            alert('The app is running in your iOS Simulator. Check your simulator window.');
+        }
+    </script>
+</body>
+</html>

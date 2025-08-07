@@ -105,11 +105,29 @@ if frontend_path.exists():
 
 @app.get("/")
 async def root():
-    """Redirect to frontend"""
-    # Use the simple frontend that works with our proven API
-    simple_frontend = frontend_path / "simple.html"
-    if simple_frontend.exists():
-        return FileResponse(str(simple_frontend))
+    """Serve the new chat-based UI"""
+    # Serve the chat UI by default with no-cache headers
+    chat_frontend = frontend_path / "chat.html"
+    if chat_frontend.exists():
+        return FileResponse(
+            str(chat_frontend),
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
+    # Fallback to simple UI
+    return FileResponse(str(frontend_path / "simple.html"))
+
+@app.get("/simple")
+async def simple_ui():
+    """Serve the simple UI that works"""
+    return FileResponse(str(frontend_path / "simple.html"))
+
+@app.get("/classic")
+async def classic_ui():
+    """Keep the classic UI available"""
     return FileResponse(str(frontend_path / "index.html"))
 
 @app.get("/api")

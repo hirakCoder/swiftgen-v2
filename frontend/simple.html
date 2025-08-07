@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwiftGen V2 - iOS App Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg py-6 px-8 shadow-lg">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold">SwiftGen V2</h1>
+                <p class="text-sm opacity-90">Production iOS App Generator</p>
+            </div>
+            <div id="status" class="text-sm">
+                <span class="inline-block w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                Ready
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-6xl mx-auto px-8 py-12">
+        <!-- Input Section -->
+        <div class="glass rounded-xl p-8 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Generate New App</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">App Description</label>
+                    <textarea 
+                        id="description" 
+                        rows="3" 
+                        class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
+                        placeholder="Describe your app (e.g., 'Create a timer app with start, stop, and reset buttons')"
+                    ></textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">App Name</label>
+                    <input 
+                        type="text" 
+                        id="appName" 
+                        class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
+                        placeholder="MyApp"
+                        value="MyApp"
+                    >
+                </div>
+                
+                <button 
+                    id="generateBtn"
+                    class="gradient-bg px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+                    onclick="generateApp()"
+                >
+                    Generate App
+                </button>
+            </div>
+        </div>
+
+        <!-- Modification Section (Hidden by default) -->
+        <div id="modifySection" class="glass rounded-xl p-8 mb-8 hidden">
+            <h2 class="text-xl font-semibold mb-4">Modify Current App</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Modification Request</label>
+                    <textarea 
+                        id="modifyDescription" 
+                        rows="2" 
+                        class="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
+                        placeholder="What would you like to change? (e.g., 'Add dark mode toggle')"
+                    ></textarea>
+                </div>
+                
+                <button 
+                    id="modifyBtn"
+                    class="gradient-bg px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+                    onclick="modifyApp()"
+                >
+                    Modify App
+                </button>
+            </div>
+        </div>
+
+        <!-- Progress Section -->
+        <div id="progressSection" class="glass rounded-xl p-8 mb-8 hidden">
+            <h2 class="text-xl font-semibold mb-4">Generation Progress</h2>
+            
+            <div id="progressSteps" class="space-y-3">
+                <!-- Progress steps will be added here -->
+            </div>
+            
+            <div id="progressBar" class="mt-6">
+                <div class="w-full bg-gray-700 rounded-full h-2">
+                    <div id="progressFill" class="gradient-bg h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Section -->
+        <div id="resultSection" class="glass rounded-xl p-8 hidden">
+            <h2 class="text-xl font-semibold mb-4">Result</h2>
+            
+            <div id="resultContent" class="space-y-4">
+                <!-- Result will be shown here -->
+            </div>
+        </div>
+
+        <!-- Log Section -->
+        <div class="glass rounded-xl p-8">
+            <h2 class="text-xl font-semibold mb-4">Activity Log</h2>
+            <div id="log" class="bg-gray-800 rounded-lg p-4 h-64 overflow-y-auto font-mono text-sm">
+                <div class="text-gray-400">Ready to generate iOS apps...</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentProjectId = null;
+        let currentAppName = null;
+        let ws = null;
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            let color = 'text-gray-300';
+            if (type === 'success') color = 'text-green-400';
+            if (type === 'error') color = 'text-red-400';
+            if (type === 'warning') color = 'text-yellow-400';
+            
+            entry.className = color;
+            entry.innerHTML = `[${timestamp}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function updateStatus(status, color = 'green') {
+            const statusEl = document.getElementById('status');
+            statusEl.innerHTML = `<span class="inline-block w-2 h-2 bg-${color}-400 rounded-full mr-2"></span>${status}`;
+        }
+
+        function showProgress(show = true) {
+            document.getElementById('progressSection').classList.toggle('hidden', !show);
+            if (show) {
+                document.getElementById('progressFill').style.width = '0%';
+                document.getElementById('progressSteps').innerHTML = '';
+            }
+        }
+
+        function addProgressStep(step, status = 'pending') {
+            const stepsEl = document.getElementById('progressSteps');
+            const stepEl = document.createElement('div');
+            stepEl.className = 'flex items-center space-x-3';
+            
+            let icon = '⏳';
+            let textColor = 'text-gray-400';
+            if (status === 'active') {
+                icon = '🔄';
+                textColor = 'text-blue-400';
+            } else if (status === 'done') {
+                icon = '✅';
+                textColor = 'text-green-400';
+            } else if (status === 'error') {
+                icon = '❌';
+                textColor = 'text-red-400';
+            }
+            
+            stepEl.innerHTML = `
+                <span class="text-lg">${icon}</span>
+                <span class="${textColor}">${step}</span>
+            `;
+            
+            stepsEl.appendChild(stepEl);
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('progressFill').style.width = `${percent}%`;
+        }
+
+        function setupWebSocket(projectId) {
+            if (ws) {
+                ws.close();
+            }
+            
+            const wsUrl = `ws://localhost:8000/ws/${projectId}`;
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                addLog('WebSocket connected', 'success');
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'status') {
+                    addLog(data.message);
+                    updateStatus('Processing', 'yellow');
+                } else if (data.type === 'success') {
+                    addLog(data.message, 'success');
+                    updateStatus('Completed', 'green');
+                } else if (data.type === 'error') {
+                    addLog(data.message, 'error');
+                    updateStatus('Error', 'red');
+                }
+            };
+            
+            ws.onerror = () => {
+                addLog('WebSocket error', 'error');
+            };
+            
+            ws.onclose = () => {
+                addLog('WebSocket disconnected', 'warning');
+            };
+        }
+
+        async function generateApp() {
+            const description = document.getElementById('description').value.trim();
+            const appName = document.getElementById('appName').value.trim() || 'MyApp';
+            
+            if (!description) {
+                addLog('Please enter an app description', 'error');
+                return;
+            }
+            
+            // Disable button
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            
+            // Show progress
+            showProgress(true);
+            updateStatus('Generating', 'yellow');
+            
+            // Add progress steps
+            addProgressStep('Processing request...', 'active');
+            updateProgress(20);
+            
+            try {
+                addLog(`Generating app: ${appName}`);
+                addLog('This may take 30-60 seconds, please wait...', 'warning');
+                
+                // Make API call with longer timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+                
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        description: description,
+                        app_name: appName
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                addProgressStep('Processing request...', 'done');
+                updateProgress(50);
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentProjectId = result.project_id;
+                    currentAppName = appName;
+                    
+                    addProgressStep('Generating code', 'done');
+                    addProgressStep('Building app', 'done');
+                    addProgressStep('Launching in simulator', 'done');
+                    updateProgress(100);
+                    
+                    addLog(`✅ App generated successfully in ${result.duration?.toFixed(1)}s`, 'success');
+                    addLog(`Project ID: ${result.project_id}`, 'info');
+                    addLog(`App Path: ${result.app_path}`, 'info');
+                    
+                    updateStatus('Ready', 'green');
+                    
+                    // Show result
+                    const resultSection = document.getElementById('resultSection');
+                    const resultContent = document.getElementById('resultContent');
+                    resultSection.classList.remove('hidden');
+                    
+                    resultContent.innerHTML = `
+                        <div class="bg-green-900/30 border border-green-500 rounded-lg p-4">
+                            <p class="text-green-400 font-semibold mb-2">✅ App Generated Successfully!</p>
+                            <p class="text-sm">Project ID: <span class="font-mono">${result.project_id}</span></p>
+                            <p class="text-sm">Duration: ${result.duration?.toFixed(1)}s</p>
+                            <p class="text-sm">The app is now running in the iOS Simulator</p>
+                        </div>
+                    `;
+                    
+                    // Show modification section
+                    document.getElementById('modifySection').classList.remove('hidden');
+                    
+                    // Setup WebSocket for future updates
+                    setupWebSocket(currentProjectId);
+                    
+                } else {
+                    addProgressStep('Error occurred', 'error');
+                    updateProgress(0);
+                    
+                    addLog(`❌ Generation failed: ${result.error}`, 'error');
+                    updateStatus('Error', 'red');
+                    
+                    // Show error in result
+                    const resultSection = document.getElementById('resultSection');
+                    const resultContent = document.getElementById('resultContent');
+                    resultSection.classList.remove('hidden');
+                    
+                    resultContent.innerHTML = `
+                        <div class="bg-red-900/30 border border-red-500 rounded-lg p-4">
+                            <p class="text-red-400 font-semibold mb-2">❌ Generation Failed</p>
+                            <p class="text-sm">${result.error || 'Unknown error occurred'}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                let errorMessage = error.message;
+                if (error.name === 'AbortError') {
+                    errorMessage = 'Request timed out after 2 minutes. The backend may still be processing.';
+                }
+                addLog(`❌ Request failed: ${errorMessage}`, 'error');
+                updateStatus('Error', 'red');
+                updateProgress(0);
+                addProgressStep('Error occurred', 'error');
+            } finally {
+                // Re-enable button
+                btn.disabled = false;
+                btn.textContent = 'Generate App';
+            }
+        }
+
+        async function modifyApp() {
+            const description = document.getElementById('modifyDescription').value.trim();
+            
+            if (!description) {
+                addLog('Please enter a modification request', 'error');
+                return;
+            }
+            
+            if (!currentProjectId) {
+                addLog('No project to modify', 'error');
+                return;
+            }
+            
+            // Disable button
+            const btn = document.getElementById('modifyBtn');
+            btn.disabled = true;
+            btn.textContent = 'Modifying...';
+            
+            updateStatus('Modifying', 'yellow');
+            
+            try {
+                addLog(`🔄 Processing modification: ${description}`);
+                addLog(`⏳ This may take 30-60 seconds...`);
+                
+                // Add timeout with better messaging
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => {
+                    controller.abort();
+                }, 120000); // 2 minute timeout
+                
+                // Make API call
+                const response = await fetch('/api/modify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        description: description,
+                        app_name: currentAppName,
+                        project_id: currentProjectId
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`✅ App modified successfully in ${result.duration?.toFixed(1)}s`, 'success');
+                    updateStatus('Ready', 'green');
+                    
+                    // Clear modification input
+                    document.getElementById('modifyDescription').value = '';
+                } else {
+                    addLog(`❌ Modification failed: ${result.error}`, 'error');
+                    
+                    // Provide more helpful error messages
+                    if (result.error?.includes('compilation') || result.error?.includes('build')) {
+                        addLog(`💡 Tip: The modification may have introduced incompatible code. Try a simpler modification.`, 'warning');
+                    }
+                    if (result.error?.includes('iOS 17')) {
+                        addLog(`⚠️ Note: Some features require iOS 17+, but this app targets iOS 16`, 'warning');
+                    }
+                    
+                    updateStatus('Error', 'red');
+                }
+            } catch (error) {
+                addLog(`❌ Request failed: ${error.message}`, 'error');
+                updateStatus('Error', 'red');
+            } finally {
+                // Re-enable button
+                btn.disabled = false;
+                btn.textContent = 'Modify App';
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            addLog('SwiftGen V2 initialized', 'success');
+            
+            // Allow Enter key to submit
+            document.getElementById('description').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    generateApp();
+                }
+            });
+            
+            document.getElementById('modifyDescription').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    modifyApp();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
