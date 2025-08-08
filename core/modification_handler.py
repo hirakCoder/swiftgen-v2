@@ -35,17 +35,25 @@ class FlexibleModificationHandler:
         """
         Handle ANY modification request flexibly
         """
+        print(f"[MODIFICATION] Starting modification for project {project_id}")
+        print(f"[MODIFICATION] Request: {modification_request}")
+        print(f"[MODIFICATION] Project path: {project_path}")
+        
         # Read existing project files
         existing_files = self._read_project_files(project_path)
         
         if not existing_files:
+            print(f"[MODIFICATION] ERROR: No existing project files found at {project_path}")
             return {
                 'success': False,
                 'error': 'No existing project files found'
             }
         
+        print(f"[MODIFICATION] Found {len(existing_files)} existing files")
+        
         # Get app name from existing files
         app_name = self._extract_app_name(existing_files)
+        print(f"[MODIFICATION] Extracted app name: {app_name}")
         
         # Build modification prompt
         from .flexible_prompt import FlexiblePromptBuilder
@@ -86,12 +94,27 @@ class FlexibleModificationHandler:
                     else:
                         modified_code = json.loads(str(response))
                 
-                # Validate the modification
-                validation = FlexiblePromptBuilder.validate_response(modified_code)
+                # Log what we got from LLM
+                print(f"[MODIFICATION] LLM returned {len(modified_code.get('files', []))} files")
+                for file in modified_code.get('files', []):
+                    print(f"[MODIFICATION] - {file['path']}: {len(file['content'])} chars")
+                    # Check for dark mode forcing
+                    if '.preferredColorScheme(.dark)' in file['content']:
+                        print(f"[MODIFICATION] WARNING: File {file['path']} forces dark mode!")
+                
+                # Validate the modification - use special validation for modifications
+                validation = FlexiblePromptBuilder.validate_modification_response(
+                    modified_code, existing_files
+                )
                 
                 if validation['valid']:
                     # Save modified files
                     self._save_modified_files(project_path, modified_code['files'])
+                    
+                    print(f"[MODIFICATION] Successfully saved {len(modified_code['files'])} files")
+                    
+                    if validation['warnings']:
+                        print(f"[MODIFICATION] Warnings: {validation['warnings']}")
                     
                     return {
                         'success': True,

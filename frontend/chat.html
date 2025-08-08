@@ -11,9 +11,27 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-swift.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&display=swap');
         
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        
+        :root {
+            /* Professional Grok-inspired palette with Apple aesthetics */
+            --bg-primary: #0e0e10;
+            --bg-secondary: #17171a;
+            --bg-tertiary: #1e1e21;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #f5f5f7;
+            --text-secondary: #86868b;
+            --text-tertiary: #515154;
+            --accent-primary: #0071e3; /* Apple Blue */
+            --accent-secondary: #30d158; /* Apple Green */
+            --accent-warning: #ffd60a; /* Apple Yellow */
+            --accent-danger: #ff453a; /* Apple Red */
+            --gradient-start: #1d72f3;
+            --gradient-end: #0a84ff;
         }
         
         /* Custom scrollbar */
@@ -93,11 +111,26 @@
             background-clip: text;
         }
         
-        /* Glass morphism effect */
+        /* Subtle glass morphism - professional */
         .glass {
-            background: rgba(17, 24, 39, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(23, 23, 26, 0.7);
+            backdrop-filter: blur(40px) saturate(150%);
+            -webkit-backdrop-filter: blur(40px) saturate(150%);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        
+        /* iOS-style card */
+        .ios-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+        }
+        
+        /* Apple-style gradient */
+        .apple-gradient {
+            background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
         }
         
         /* Code block styling */
@@ -190,27 +223,34 @@
         }
     </style>
 </head>
-<body class="bg-gray-950 text-gray-100 h-screen overflow-hidden">
+<body class="h-screen overflow-hidden" style="background: var(--bg-primary); color: var(--text-primary);">
+    <!-- Animated Code Background -->
+    <div id="codeBackground" class="fixed inset-0 overflow-hidden opacity-0 transition-opacity duration-1000 pointer-events-none">
+        <pre id="scrollingCode" class="text-xs leading-relaxed" style="color: rgba(0, 113, 227, 0.25); transform: translateY(100%); animation: scrollCode 30s linear infinite; white-space: pre-wrap; font-family: 'SF Mono', 'Monaco', monospace;">
+        </pre>
+    </div>
     <!-- Main Container -->
     <div class="flex h-full">
         <!-- Sidebar - Thread History -->
-        <div class="w-80 glass border-r border-gray-800 flex flex-col">
+        <div class="w-80 glass flex flex-col" style="border-right: 1px solid var(--border-color);">
             <!-- Logo & New Chat -->
-            <div class="p-6 border-b border-gray-800">
+            <div class="p-6" style="border-bottom: 1px solid var(--border-color);">
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                            <i class="fas fa-cube text-white"></i>
+                        <div class="w-10 h-10 apple-gradient rounded-2xl flex items-center justify-center shadow-lg">
+                            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M18.5 9.5a4.22 4.22 0 0 1-1.3 3.04L20.71 16l-1.42 1.42L15.82 14a4.22 4.22 0 0 1-3.04 1.3A4.3 4.3 0 0 1 8.5 11a4.3 4.3 0 0 1 4.28-4.3A4.3 4.3 0 0 1 17.08 11c0 .5-.08.98-.24 1.42l1.66 1.66z"/>
+                            </svg>
                         </div>
-                        <h1 class="text-xl font-semibold">SwiftGen</h1>
+                        <h1 class="text-xl font-semibold" style="color: var(--text-primary);">SwiftGen</h1>
                     </div>
                     <button onclick="newThread()" class="p-2 hover:bg-gray-800 rounded-lg transition-colors">
                         <i class="fas fa-plus text-gray-400"></i>
                     </button>
                 </div>
                 
-                <button onclick="newThread()" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 rounded-xl font-medium flex items-center justify-center gap-2 glow">
-                    <i class="fas fa-message"></i>
+                <button onclick="newThread()" class="w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-all hover:opacity-90" style="background: var(--accent-primary); color: white;">
+                    <i class="fas fa-plus"></i>
                     New App
                 </button>
             </div>
@@ -243,8 +283,8 @@
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-4">
                         <h2 id="currentAppName" class="text-lg font-semibold">New App</h2>
-                        <div id="appStatus" class="hidden items-center gap-2 px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm">
-                            <div class="w-2 h-2 bg-green-400 rounded-full pulse"></div>
+                        <div id="appStatus" class="hidden items-center gap-2 px-3 py-1 rounded-full text-sm" style="background: rgba(48, 209, 88, 0.15); color: var(--accent-secondary);">
+                            <div class="w-2 h-2 rounded-full pulse" style="background: var(--accent-secondary);"></div>
                             <span>Running</span>
                         </div>
                     </div>
@@ -266,11 +306,13 @@
                 <div id="messages" class="max-w-4xl mx-auto space-y-6">
                     <!-- Welcome Message -->
                     <div class="text-center py-12">
-                        <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                            <i class="fas fa-rocket text-white text-3xl"></i>
+                        <div class="w-20 h-20 apple-gradient rounded-3xl flex items-center justify-center mx-auto mb-6" style="box-shadow: 0 10px 40px rgba(0, 113, 227, 0.2);">
+                            <svg class="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M18.69 12.7l-3.62-8.42c-.23-.54-.96-.54-1.19 0l-1.69 3.93-3.7-3.7c-.39-.39-1.02-.39-1.41 0-.39.39-.39 1.02 0 1.41l3.71 3.71-3.94 1.69c-.54.23-.54.96 0 1.19l8.42 3.62c.21.09.45.09.66 0l5.18-2.23c.54-.23.54-.96 0-1.19l-2.23-.96 2.23-.96c.54-.23.54-.96 0-1.19l-2.42-1.04zm-6.69.88l2.03-4.72 2.48 5.78-4.51-1.06zm4.84 2.47l-4.97-2.14 9.73 4.19-4.76-2.05z"/>
+                            </svg>
                         </div>
-                        <h2 class="text-2xl font-semibold mb-2 gradient-text">Build your iOS app with AI</h2>
-                        <p class="text-gray-400 mb-8">Describe your app idea and I'll build it for you instantly</p>
+                        <h2 class="text-2xl font-semibold mb-2" style="color: var(--text-primary);">Build your iOS app with AI</h2>
+                        <p class="mb-8" style="color: var(--text-secondary);">Describe your app idea and we'll build it for you instantly</p>
                         
                         <!-- Quick Start Templates -->
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
@@ -458,20 +500,40 @@
             console.log('WebSocket message:', data);
             
             if (data.type === 'status') {
-                // Map WebSocket status to progress stages
+                // Map WebSocket status to progress stages - more detailed
                 const message = data.message.toLowerCase();
-                if (message.includes('generating') || message.includes('creating')) {
-                    updateProgressStage('generate', 'active', 'Generating Swift code...');
-                } else if (message.includes('building') || message.includes('compiling')) {
+                
+                // Parse backend messages for better progress tracking
+                if (message.includes('[pipeline] starting')) {
+                    updateProgressStage('analyze', 'active', 'Analyzing requirements...');
+                } else if (message.includes('[pipeline] intent parsed')) {
+                    updateProgressStage('analyze', 'completed');
+                    updateProgressStage('generate', 'active', 'AI generating code...');
+                } else if (message.includes('[llm router]')) {
+                    updateProgressStage('generate', 'active', 'Calling AI model...');
+                } else if (message.includes('[pipeline] code generated')) {
                     updateProgressStage('generate', 'completed');
-                    updateProgressStage('build', 'active', 'Building with Xcode...');
-                } else if (message.includes('deploy') || message.includes('install')) {
-                    updateProgressStage('build', 'completed');
-                    updateProgressStage('deploy', 'active', 'Installing on simulator...');
-                } else if (message.includes('launch') || message.includes('running')) {
-                    updateProgressStage('deploy', 'completed');
-                    updateProgressStage('launch', 'active', 'Starting app...');
+                    updateProgressStage('build', 'active', 'Building app...');
+                } else if (message.includes('[direct build]')) {
+                    updateProgressStage('build', 'active', 'Compiling Swift files...');
+                } else if (message.includes('[simulator]')) {
+                    if (message.includes('booting')) {
+                        updateProgressStage('build', 'completed');
+                        updateProgressStage('deploy', 'active', 'Booting simulator (may take 1-2 min)...');
+                    } else if (message.includes('using already booted')) {
+                        updateProgressStage('build', 'completed');
+                        updateProgressStage('deploy', 'active', 'Installing on simulator...');
+                    } else if (message.includes('successfully launched')) {
+                        updateProgressStage('deploy', 'completed');
+                        updateProgressStage('launch', 'completed', 'App launched!');
+                    }
+                } else if (message.includes('[pipeline] build successful')) {
+                    updateProgressStage('launch', 'completed', 'Success!');
+                    setTimeout(() => completeProgress(true), 1000);
+                } else if (message.includes('[pipeline] build failed')) {
+                    completeProgress(false);
                 }
+                
                 updateStatus(data.message);
             } else if (data.type === 'success') {
                 updateAppStatus('running');
@@ -529,46 +591,61 @@
                 existingProgress.remove();
             }
             
+            // Show code background animation
+            startCodeBackground();
+            
             // Create new progress indicator
             const progressEl = document.createElement('div');
             progressEl.id = 'progressIndicator';
-            progressEl.className = 'glass rounded-xl p-6 mb-4';
+            progressEl.className = 'glass rounded-xl p-6 mb-4 transition-all duration-500';
             
             // Progress header
             const headerHtml = `
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-sm font-medium text-gray-300">Processing your request</h3>
-                    <div class="flex items-center gap-2 text-xs text-gray-500">
-                        <div class="w-2 h-2 bg-blue-400 rounded-full pulse"></div>
-                        <span id="progressTimer">0:00</span>
+                    <div class="flex items-center gap-3">
+                        <h3 class="text-sm font-medium" style="color: var(--text-primary);">Building your app</h3>
+                        <div class="progress-summary hidden items-center gap-2">
+                            <i class="fas fa-check-circle text-green-400"></i>
+                            <span class="text-xs" style="color: var(--text-secondary);">Completed in <span id="finalTime"></span></span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-2 text-xs" style="color: var(--text-tertiary);">
+                            <div class="w-2 h-2 rounded-full pulse" style="background: var(--accent-primary);"></div>
+                            <span id="progressTimer">0:00</span>
+                        </div>
+                        <button onclick="toggleProgress()" class="p-1 hover:bg-gray-800 rounded-lg transition-colors">
+                            <i id="progressToggle" class="fas fa-chevron-down text-xs" style="color: var(--text-tertiary);"></i>
+                        </button>
                     </div>
                 </div>
             `;
             
             // Progress stages
-            const stagesHtml = progressStages.map((stage, index) => `
+            const stagesHtml = `<div class="progress-details">` + progressStages.map((stage, index) => `
                 <div class="flex items-center gap-3 mb-3 stage-item" data-stage="${stage.id}">
-                    <div class="stage-icon w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-sm ${index === 0 ? 'progress-active bg-blue-600' : ''}">
+                    <div class="stage-icon w-8 h-8 rounded-full flex items-center justify-center text-sm ${index === 0 ? 'progress-active' : ''}" style="background: ${index === 0 ? 'var(--accent-primary)' : 'var(--bg-tertiary)'}; border: 1px solid var(--border-color);">
                         <span class="stage-emoji">${stage.icon}</span>
                     </div>
                     <div class="flex-1">
-                        <div class="text-sm stage-label ${index === 0 ? 'text-white' : 'text-gray-500'}">${stage.label}</div>
-                        <div class="stage-status text-xs text-gray-600 hidden"></div>
+                        <div class="text-sm stage-label" style="color: ${index === 0 ? 'var(--text-primary)' : 'var(--text-tertiary)'};">${stage.label}</div>
+                        <div class="stage-status text-xs hidden" style="color: var(--text-tertiary);"></div>
                     </div>
                     <div class="stage-check hidden">
-                        <i class="fas fa-check-circle text-green-400"></i>
+                        <i class="fas fa-check-circle" style="color: var(--accent-secondary);"></i>
                     </div>
                 </div>
-            `).join('');
+            `).join('') + '</div>';
             
             // Progress bar
             const progressBarHtml = `
-                <div class="mt-4 bg-gray-800 rounded-full h-2 overflow-hidden">
-                    <div id="progressBar" class="progress-bar bg-gradient-to-r from-blue-500 to-purple-600 h-full rounded-full" style="width: 0%"></div>
+                <div class="progress-details mt-4 rounded-full h-2 overflow-hidden" style="background: var(--bg-tertiary);">
+                    <div id="progressBar" class="progress-bar h-full rounded-full" style="background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end)); width: 0%;"></div>
                 </div>
             `;
             
             progressEl.innerHTML = headerHtml + '<div class="space-y-1">' + stagesHtml + '</div>' + progressBarHtml;
+            progressEl.dataset.completed = 'false';
             messagesEl.appendChild(progressEl);
             
             // Start timer
@@ -601,6 +678,171 @@
                 clearInterval(progressTimerInterval);
                 progressTimerInterval = null;
             }
+        }
+        
+        // Toggle progress collapse/expand
+        function toggleProgress() {
+            const progressEl = document.getElementById('progressIndicator');
+            if (!progressEl) return;
+            
+            const toggleIcon = document.getElementById('progressToggle');
+            
+            if (progressEl.classList.contains('progress-collapsed')) {
+                progressEl.classList.remove('progress-collapsed');
+                progressEl.classList.add('progress-expanded');
+                toggleIcon.classList.remove('fa-chevron-up');
+                toggleIcon.classList.add('fa-chevron-down');
+            } else {
+                progressEl.classList.add('progress-collapsed');
+                progressEl.classList.remove('progress-expanded');
+                toggleIcon.classList.remove('fa-chevron-down');
+                toggleIcon.classList.add('fa-chevron-up');
+            }
+        }
+        
+        // Start code background animation
+        function startCodeBackground() {
+            const bgEl = document.getElementById('codeBackground');
+            const codeEl = document.getElementById('scrollingCode');
+            
+            // Sample Swift code for background
+            const swiftCode = `// SwiftUI Application
+import SwiftUI
+import Foundation
+
+struct ContentView: View {
+    @State private var items: [TodoItem] = []
+    @State private var newItemText = ""
+    @State private var selectedCategory: Category = .personal
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                // Header
+                HStack {
+                    Text("My Tasks")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    Spacer()
+                    Button(action: addItem) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title)
+                            .foregroundColor(.blue)
+                    }
+                }
+                .padding()
+                
+                // Category Picker
+                Picker("Category", selection: $selectedCategory) {
+                    ForEach(Category.allCases) { category in
+                        Text(category.rawValue).tag(category)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding(.horizontal)
+                
+                // Todo List
+                List {
+                    ForEach(filteredItems) { item in
+                        TodoRowView(item: item)
+                            .swipeActions {
+                                Button("Delete") {
+                                    deleteItem(item)
+                                }
+                                .tint(.red)
+                            }
+                    }
+                }
+                .listStyle(PlainListStyle())
+                
+                // Add Item Field
+                HStack {
+                    TextField("New task...", text: $newItemText)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    Button("Add") {
+                        addItem()
+                    }
+                    .disabled(newItemText.isEmpty)
+                }
+                .padding()
+            }
+            .navigationBarHidden(true)
+        }
+    }
+    
+    private var filteredItems: [TodoItem] {
+        items.filter { $0.category == selectedCategory }
+    }
+    
+    private func addItem() {
+        guard !newItemText.isEmpty else { return }
+        let newItem = TodoItem(
+            text: newItemText,
+            category: selectedCategory
+        )
+        items.append(newItem)
+        newItemText = ""
+    }
+    
+    private func deleteItem(_ item: TodoItem) {
+        items.removeAll { $0.id == item.id }
+    }
+}
+
+struct TodoItem: Identifiable {
+    let id = UUID()
+    let text: String
+    let category: Category
+    var isCompleted = false
+}
+
+enum Category: String, CaseIterable, Identifiable {
+    case personal = "Personal"
+    case work = "Work"
+    case shopping = "Shopping"
+    
+    var id: String { rawValue }
+}
+
+struct TodoRowView: View {
+    let item: TodoItem
+    
+    var body: some View {
+        HStack {
+            Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                .foregroundColor(item.isCompleted ? .green : .gray)
+            Text(item.text)
+                .strikethrough(item.isCompleted)
+            Spacer()
+            Text(item.category.rawValue)
+                .font(.caption)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.blue.opacity(0.2))
+                .cornerRadius(8)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+@main
+struct TodoApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}`;
+            
+            // Set code content and start animation
+            codeEl.textContent = swiftCode + '\n\n' + swiftCode; // Duplicate for continuous scroll
+            bgEl.style.opacity = '1';
+        }
+        
+        // Stop code background animation
+        function stopCodeBackground() {
+            const bgEl = document.getElementById('codeBackground');
+            bgEl.style.opacity = '0';
         }
         
         // Update progress stage
@@ -658,6 +900,7 @@
         // Complete all progress
         function completeProgress(success = true) {
             stopProgressTimer();
+            stopCodeBackground();
             
             // Mark all stages as completed or error
             progressStages.forEach(stage => {
@@ -672,37 +915,65 @@
                 progressBar.style.width = '100%';
             }
             
-            // Remove progress indicator after a delay
+            // Auto-collapse progress after completion
             setTimeout(() => {
                 const progressEl = document.getElementById('progressIndicator');
-                if (progressEl) {
-                    progressEl.style.opacity = '0';
-                    setTimeout(() => progressEl.remove(), 300);
+                if (progressEl && !progressEl.classList.contains('progress-collapsed')) {
+                    // Update final time
+                    const finalTimeEl = document.getElementById('finalTime');
+                    const timerEl = document.getElementById('progressTimer');
+                    if (finalTimeEl && timerEl) {
+                        finalTimeEl.textContent = timerEl.textContent;
+                    }
+                    
+                    // Show summary and collapse
+                    const summaryEl = progressEl.querySelector('.progress-summary');
+                    if (summaryEl) {
+                        summaryEl.classList.remove('hidden');
+                        summaryEl.classList.add('flex');
+                    }
+                    
+                    progressEl.classList.add('progress-collapsed');
+                    progressEl.dataset.completed = 'true';
+                    
+                    const toggleIcon = document.getElementById('progressToggle');
+                    if (toggleIcon) {
+                        toggleIcon.classList.remove('fa-chevron-down');
+                        toggleIcon.classList.add('fa-chevron-up');
+                    }
                 }
             }, success ? 2000 : 5000);
         }
         
         // Add status message to chat (simplified version for backward compatibility)
         function addStatusMessage(message) {
-            // Map messages to progress stages
-            if (message.includes('Starting app generation')) {
+            // Map messages to progress stages - more aggressive updates
+            const msg = message.toLowerCase();
+            
+            if (msg.includes('starting') || msg.includes('generation')) {
                 initProgressStages('generation');
                 updateProgressStage('analyze', 'active');
-            } else if (message.includes('Processing your request')) {
+            }
+            
+            // Check WebSocket messages for progress
+            if (msg.includes('llm') || msg.includes('claude') || msg.includes('gpt')) {
                 updateProgressStage('analyze', 'completed');
                 updateProgressStage('generate', 'active');
-            } else if (message.includes('Building') || message.includes('Compiling')) {
+            } else if (msg.includes('generated') || msg.includes('parsed')) {
                 updateProgressStage('generate', 'completed');
                 updateProgressStage('build', 'active');
-            } else if (message.includes('Deploying') || message.includes('Installing')) {
+            } else if (msg.includes('build') || msg.includes('compil')) {
+                updateProgressStage('build', 'active');
+            } else if (msg.includes('simulator') || msg.includes('install')) {
                 updateProgressStage('build', 'completed');
                 updateProgressStage('deploy', 'active');
-            } else if (message.includes('Launching') || message.includes('Opening')) {
+            } else if (msg.includes('launch') || msg.includes('success')) {
                 updateProgressStage('deploy', 'completed');
                 updateProgressStage('launch', 'active');
-            } else if (message.includes('✅') && message.includes('success')) {
-                completeProgress(true);
-            } else if (message.includes('❌') || message.includes('error') || message.includes('failed')) {
+                if (msg.includes('successful')) {
+                    setTimeout(() => completeProgress(true), 1000);
+                }
+            } else if (msg.includes('error') || msg.includes('failed')) {
                 completeProgress(false);
             }
             
@@ -846,10 +1117,8 @@
                 appName = extractAppName(description) || `App${Date.now()}`;
             }
             
-            // Ensure app name ends with 'App' if it doesn't already
-            if (!appName.endsWith('App')) {
-                appName = appName + 'App';
-            }
+            // Don't add 'App' if it already ends with 'App'
+            // This was causing TimerApp to become TimerAppApp
             
             console.log('Description:', description);
             console.log('App name:', appName);
@@ -860,7 +1129,7 @@
             
             // Use longer timeout for generation
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout for simulator boot
             
             let result;
             try {
@@ -889,13 +1158,25 @@
                 throw error;
             }
             
-            if (result && result.success) {
-                // Update progress
+            // Check if we got a project_id - that means at least code was generated
+            if (result && (result.success || result.project_id)) {
+                // Update progress based on what we got
                 updateProgressStage('analyze', 'completed', 'Requirements analyzed');
                 updateProgressStage('generate', 'completed', 'Code generated');
-                updateProgressStage('build', 'completed', 'App built successfully');
-                updateProgressStage('deploy', 'completed', 'Deployed to simulator');
-                updateProgressStage('launch', 'completed', 'App launched');
+                
+                if (result.success) {
+                    // Full success - app is running
+                    updateProgressStage('build', 'completed', 'App built successfully');
+                    updateProgressStage('deploy', 'completed', 'Deployed to simulator');
+                    updateProgressStage('launch', 'completed', 'App launched');
+                } else if (result.app_path) {
+                    // Partial success - built but not launched
+                    updateProgressStage('build', 'completed', 'App built');
+                    updateProgressStage('deploy', 'error', 'Failed to launch');
+                } else {
+                    // Build failed but code was generated
+                    updateProgressStage('build', 'error', 'Build failed - check logs');
+                }
                 
                 currentProjectId = result.project_id;
                 currentAppName = appName;
@@ -916,17 +1197,25 @@
                     setupWebSocket(currentProjectId);
                 }
                 
-                // Complete progress successfully
-                completeProgress(true);
+                // Complete progress based on actual result
+                completeProgress(result.success !== false);
                 
-                // Add AI response
-                const aiMessage = `✅ Successfully created ${appName}!\n\nYour app is now running in the iOS Simulator. You can modify it by describing what changes you'd like.`;
+                // Add AI response based on outcome
+                let aiMessage;
+                if (result.success) {
+                    aiMessage = `✅ Successfully created ${appName}!\n\nYour app is now running in the iOS Simulator. You can modify it by describing what changes you'd like.`;
+                    updateAppStatus('running');
+                } else if (result.app_path) {
+                    aiMessage = `⚠️ ${appName} was created but couldn't launch automatically.\n\nThe code has been generated. You may need to open it manually in Xcode.`;
+                } else {
+                    aiMessage = `⚠️ ${appName} code was generated but encountered build errors.\n\nThe project has been created at: ${result.project_id}\n\nYou can still try to modify it or check the logs for details.`;
+                }
+                
                 addMessageToUI(aiMessage, 'assistant', true);
                 currentThread.messages.push({ role: 'assistant', content: aiMessage });
                 saveThreads();
                 
-                // Update status
-                updateAppStatus('running');
+                // Update app name regardless
                 document.getElementById('currentAppName').textContent = appName;
                 
                 // Clear app name input
@@ -941,8 +1230,9 @@
                     updateFileList(result.files);
                 }
             } else {
+                // Complete failure - no project created
                 completeProgress(false);
-                throw new Error(result.error || 'Failed to generate app');
+                throw new Error(result?.error || 'Failed to generate app. Please try again.');
             }
         }
         
@@ -959,7 +1249,7 @@
             
             // Use longer timeout for modification
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout for simulator boot
             
             const requestBody = {
                 description: description,
@@ -1244,7 +1534,8 @@
                 if (descLower.includes(keyword)) {
                     // Clean up the name - remove spaces and capitalize
                     const baseName = keyword.charAt(0).toUpperCase() + keyword.slice(1);
-                    return baseName + 'App';
+                    // Only add 'App' if it doesn't end with it
+                    return baseName.endsWith('App') ? baseName : baseName + 'App';
                 }
             }
             

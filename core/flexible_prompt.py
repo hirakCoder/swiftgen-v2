@@ -167,11 +167,20 @@ Return JSON with your creative implementation:
         # Analyze modification intent
         mod_hints = FlexiblePromptBuilder._analyze_modification_intent(modification_request)
         
-        prompt = f"""Modify this iOS app based on the user's request.
+        prompt = f"""⚠️ MODIFICATION REQUEST - DO NOT CREATE A NEW APP ⚠️
+
+You are MODIFYING an existing iOS app. The user wants to ADD or CHANGE specific features while keeping everything else the same.
 
 USER'S REQUEST: {modification_request}
 
 {mod_hints}
+
+🔴 CRITICAL MODIFICATION RULES:
+1. This is an EXISTING app - preserve its identity and functionality
+2. ONLY modify what the user explicitly asks for
+3. When user says "add X" - they mean ADD it to existing app, not replace anything
+4. When user says "add option/toggle for X" - add a CONTROL, don't force the feature
+5. Keep ALL existing features working exactly as before
 
 MODIFICATION PRINCIPLES:
 • ONLY make the changes explicitly requested - nothing more, nothing less
@@ -187,6 +196,7 @@ STRICT REQUIREMENTS:
 • NO layout changes unless explicitly requested
 • NO style changes unless explicitly requested
 • NO refactoring unless explicitly requested
+• NO removing existing features unless explicitly requested
 • Maintain iOS 16.0+ compatibility
 • Keep accessibility support
 • Ensure responsive layout on all devices
@@ -229,6 +239,28 @@ Return JSON with the modified implementation:
         request_lower = request.lower()
         hints = []
         
+        # ALWAYS add this critical instruction first
+        hints.append("⚠️ CRITICAL: THIS IS A MODIFICATION REQUEST")
+        hints.append("• You are MODIFYING an existing app, NOT creating a new one")
+        hints.append("• PRESERVE all existing functionality")
+        hints.append("• ONLY change what is explicitly requested")
+        hints.append("")
+        
+        # Check for common modification patterns that indicate adding controls/options
+        if any(phrase in request_lower for phrase in ['add toggle', 'add option', 'add switch', 'add button', 'add control', 'allow user to', 'let user', 'give option']):
+            hints.append("USER CONTROL REQUESTED:")
+            hints.append("• User wants to ADD a control/option, not force a change")
+            hints.append("• Add UI element that gives user choice")
+            hints.append("• Do NOT automatically apply the feature")
+            hints.append("")
+        
+        # Common modification phrases that should NEVER create a new app
+        if any(phrase in request_lower for phrase in ['change the', 'modify the', 'update the', 'improve the', 'fix the', 'adjust the', 'make it', 'can you add', 'please add']):
+            hints.append("MODIFICATION KEYWORDS DETECTED:")
+            hints.append("• These phrases indicate modifying EXISTING app")
+            hints.append("• NOT creating something new")
+            hints.append("")
+        
         # UI modifications
         if any(word in request_lower for word in ['color', 'theme', 'style', 'design', 'look']):
             hints.append("UI/DESIGN CHANGE DETECTED:")
@@ -236,7 +268,18 @@ Return JSON with the modified implementation:
             hints.append("• Ensure contrast ratios for accessibility")
             hints.append("• Keep consistent styling throughout")
         
-        # Feature additions
+        # Dark mode toggle specific
+        if any(phrase in request_lower for phrase in ['dark mode', 'night mode', 'theme toggle', 'appearance']):
+            if 'toggle' in request_lower or 'option' in request_lower or 'switch' in request_lower or 'choose' in request_lower:
+                hints.append("DARK MODE TOGGLE REQUESTED:")
+                hints.append("• Add a UI control (toggle/switch) that lets users choose")
+                hints.append("• Use @AppStorage to persist the preference")
+                hints.append("• Apply .preferredColorScheme() based on user's choice")
+                hints.append("• DO NOT force dark mode - give users control")
+                hints.append("• Example: @AppStorage('darkMode') var darkMode = false")
+                hints.append("• Then use: .preferredColorScheme(darkMode ? .dark : .light)")
+        
+        # Feature additions - be very careful here
         elif any(word in request_lower for word in ['add', 'new', 'feature', 'include']):
             # Check if UI/UX enhancement is also requested
             if any(word in request_lower for word in ['enhance', 'improve', 'redesign', 'modern', 'better ui', 'better ux']):
@@ -248,8 +291,10 @@ Return JSON with the modified implementation:
                 hints.append("FEATURE ADDITION DETECTED (MINIMAL CHANGE):")
                 hints.append("• Add ONLY the requested feature")
                 hints.append("• DO NOT change existing UI elements")
+                hints.append("• DO NOT change the app's purpose or core functionality")
                 hints.append("• Integrate with minimal visual impact")
                 hints.append("• Preserve existing styles and layouts")
+                hints.append("• Example: 'add a button' means ADD a new button, keep all existing buttons")
         
         # Bug fixes
         elif any(word in request_lower for word in ['fix', 'bug', 'error', 'crash', 'broken']):
@@ -303,6 +348,55 @@ Return JSON with the modified implementation:
             'app_type': 'custom',  # Always use custom to avoid restrictions
             'must_have_features': [],  # Don't extract features, let LLM interpret
             'description': request  # Pass full request for context
+        }
+    
+    @staticmethod
+    def validate_modification_response(response: dict, original_files: List[Dict]) -> dict:
+        """
+        Validate that modification response properly modifies existing app
+        """
+        issues = []
+        warnings = []
+        
+        # Check that we still have the core files
+        if 'files' not in response:
+            issues.append("Missing files in response")
+            return {'valid': False, 'issues': issues, 'warnings': warnings}
+        
+        # Get original app name
+        original_app_name = None
+        for file in original_files:
+            if 'App.swift' in file.get('filename', ''):
+                content = file.get('content', '')
+                import re
+                match = re.search(r'struct\s+(\w+)App\s*:', content)
+                if match:
+                    original_app_name = match.group(1)
+                    break
+        
+        # Check that app name hasn't changed (indicating a new app)
+        for file in response['files']:
+            if 'App.swift' in file.get('path', ''):
+                content = file.get('content', '')
+                import re
+                match = re.search(r'struct\s+(\w+)App\s*:', content)
+                if match and original_app_name:
+                    new_app_name = match.group(1)
+                    if new_app_name != original_app_name:
+                        issues.append(f"App name changed from {original_app_name} to {new_app_name} - this created a new app!")
+        
+        # Ensure we have the same core structure
+        original_file_count = len(original_files)
+        new_file_count = len(response['files'])
+        
+        # Allow adding files, but warn if too many files removed
+        if new_file_count < original_file_count - 2:
+            warnings.append(f"Significant file reduction: {original_file_count} -> {new_file_count}")
+        
+        return {
+            'valid': len(issues) == 0,
+            'issues': issues,
+            'warnings': warnings
         }
     
     @staticmethod

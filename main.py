@@ -52,7 +52,7 @@ class GenerateRequest(BaseModel):
     description: str
     app_name: str
     provider: Optional[str] = None  # claude, gpt4, grok, or hybrid
-    project_id: Optional[str] = None  # For modifications
+    project_id: Optional[str] = None  # For modifications or WebSocket sync
 
 class GenerateResponse(BaseModel):
     success: bool
@@ -105,20 +105,20 @@ if frontend_path.exists():
 
 @app.get("/")
 async def root():
-    """Serve the new chat-based UI"""
-    # Serve the chat UI by default with no-cache headers
-    chat_frontend = frontend_path / "chat.html"
-    if chat_frontend.exists():
+    """Serve the premium UI"""
+    # Serve the premium UI by default with no-cache headers
+    premium_frontend = frontend_path / "premium.html"
+    if premium_frontend.exists():
         return FileResponse(
-            str(chat_frontend),
+            str(premium_frontend),
             headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Pragma": "no-cache",
                 "Expires": "0"
             }
         )
-    # Fallback to simple UI
-    return FileResponse(str(frontend_path / "simple.html"))
+    # Fallback to chat UI
+    return FileResponse(str(frontend_path / "chat.html"))
 
 @app.get("/simple")
 async def simple_ui():
@@ -129,6 +129,87 @@ async def simple_ui():
 async def classic_ui():
     """Keep the classic UI available"""
     return FileResponse(str(frontend_path / "index.html"))
+
+@app.get("/api/simulators")
+async def get_simulators():
+    """Get available simulators and devices"""
+    try:
+        import subprocess
+        import json
+        
+        # Get simulator list
+        result = subprocess.run(
+            ["xcrun", "simctl", "list", "devices", "-j"],
+            capture_output=True,
+            text=True
+        )
+        
+        data = json.loads(result.stdout)
+        
+        booted = []
+        available = []
+        
+        for runtime, devices in data["devices"].items():
+            if "iOS" in runtime:
+                for device in devices:
+                    if device.get("state") == "Booted":
+                        booted.append({
+                            "name": device["name"],
+                            "udid": device["udid"],
+                            "state": device["state"]
+                        })
+                    elif device.get("isAvailable", False):
+                        available.append({
+                            "name": device["name"],
+                            "udid": device["udid"],
+                            "state": device.get("state", "Shutdown")
+                        })
+        
+        # Try to get real devices (may fail if not available)
+        devices = []
+        try:
+            device_result = subprocess.run(
+                ["xcrun", "devicectl", "list", "devices", "-j"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            if device_result.returncode == 0:
+                device_data = json.loads(device_result.stdout)
+                # Parse real devices if available
+                pass
+        except:
+            pass
+        
+        return {
+            "booted": booted,
+            "available": available,
+            "devices": devices
+        }
+    except Exception as e:
+        return {"error": str(e), "booted": [], "available": [], "devices": []}
+
+@app.post("/api/simulator/boot")
+async def boot_simulator(request: dict):
+    """Boot a specific simulator"""
+    try:
+        import subprocess
+        udid = request.get("udid")
+        if not udid:
+            return {"error": "No simulator UDID provided"}
+        
+        subprocess.run(
+            ["xcrun", "simctl", "boot", udid],
+            capture_output=True,
+            text=True
+        )
+        
+        # Open Simulator app
+        subprocess.run(["open", "-a", "Simulator"], capture_output=True)
+        
+        return {"success": True, "message": f"Simulator {udid} booted"}
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/api")
 async def api_info():
@@ -144,6 +225,38 @@ async def api_info():
             "health": "/api/health"
         }
     }
+
+@app.post("/api/rebuild")
+async def rebuild_endpoint(request: Dict) -> Dict:
+    """Rebuild an existing project"""
+    project_id = request.get('project_id')
+    if not project_id:
+        raise HTTPException(status_code=400, detail="project_id required")
+    
+    project_path = f"workspaces/{project_id}"
+    if not os.path.exists(project_path):
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+    
+    print(f"[REBUILD] Rebuilding project {project_id}")
+    
+    # Build and launch
+    from build.direct_build import DirectBuildSystem
+    builder = DirectBuildSystem()
+    result = await builder.build_and_launch(project_path, project_id)
+    
+    if result.get('success'):
+        return {
+            "success": True,
+            "project_id": project_id,
+            "app_path": result.get('app_path'),
+            "message": "Project rebuilt successfully"
+        }
+    else:
+        return {
+            "success": False,
+            "project_id": project_id,
+            "error": result.get('error', 'Build failed')
+        }
 
 @app.post("/api/modify", response_model=GenerateResponse)
 async def modify_app(request: GenerateRequest):
@@ -161,6 +274,13 @@ async def modify_app(request: GenerateRequest):
         project_id = request.project_id or request.app_name.lower().replace(' ', '_')
         project_path = f"workspaces/{project_id}"
         
+        # Send WebSocket update for analyze stage
+        await manager.send_message(project_id, {
+            'type': 'status',
+            'message': 'Analyzing modification request...',
+            'stage': 'analyze'
+        })
+        
         if not os.path.exists(project_path):
             return GenerateResponse(
                 success=False,
@@ -168,6 +288,13 @@ async def modify_app(request: GenerateRequest):
                 message="Project not found",
                 error=f"No project found at {project_path}"
             )
+        
+        # Send WebSocket update for modify stage
+        await manager.send_message(project_id, {
+            'type': 'status',
+            'message': 'Modifying code...',
+            'stage': 'modify'
+        })
         
         # Route modification - use enhanced_service directly if available for better modification handling
         llm_service = llm_router
@@ -183,6 +310,13 @@ async def modify_app(request: GenerateRequest):
         if result['success']:
             print(f"[MODIFY] Files modified successfully, rebuilding {project_id}...")
             
+            # Send WebSocket update for build stage
+            await manager.send_message(project_id, {
+                'type': 'status',
+                'message': 'Rebuilding app with modifications...',
+                'stage': 'build'
+            })
+            
             # Rebuild and relaunch the app with modifications
             from build.direct_build import DirectBuildSystem
             builder = DirectBuildSystem()
@@ -194,19 +328,55 @@ async def modify_app(request: GenerateRequest):
                 shutil.rmtree(build_dir)
                 print(f"[MODIFY] Cleaned build directory for fresh build")
             
+            # Send WebSocket update for deploy stage
+            await manager.send_message(project_id, {
+                'type': 'status',
+                'message': 'Deploying modified app...',
+                'stage': 'deploy'
+            })
+            
             # Build and launch the modified app
             build_result = await builder.build_and_launch(project_path, project_id)
             
             if build_result.get('success'):
                 print(f"[MODIFY] App rebuilt and relaunched successfully!")
+                
+                # Send WebSocket update for reload stage
+                await manager.send_message(project_id, {
+                    'type': 'status',
+                    'message': 'Reloading app with changes...',
+                    'stage': 'reload'
+                })
+                
+                # Send success message to trigger completion
+                await manager.send_message(project_id, {
+                    'type': 'success',
+                    'message': f'Modification complete! {result.get("files_modified", 0)} files updated.'
+                })
+                
+                # Create detailed modification summary
+                modification_summary = f"✅ Successfully modified your app!\n\n"
+                modification_summary += f"**What was changed:**\n"
+                modification_summary += f"• Modified {result.get('files_modified', 0)} files\n"
+                modification_summary += f"• {request.description}\n\n"
+                modification_summary += f"**Status:** App rebuilt and running in simulator\n"
+                modification_summary += f"**Time:** {time.time() - start_time:.1f} seconds"
+                
                 return GenerateResponse(
                     success=True,
                     project_id=project_id,
-                    message=f"✅ App modified and relaunched! {result.get('files_modified', 0)} files updated",
+                    message=modification_summary,
                     app_path=build_result.get('app_path'),
                     duration=time.time() - start_time
                 )
             else:
+                # Send build error via WebSocket
+                await manager.send_message(project_id, {
+                    'type': 'error',
+                    'message': f"Build failed: {build_result.get('error')}",
+                    'stage': 'build'
+                })
+                
                 return GenerateResponse(
                     success=False,
                     project_id=project_id,
@@ -215,6 +385,13 @@ async def modify_app(request: GenerateRequest):
                     duration=time.time() - start_time
                 )
         else:
+            # Send error via WebSocket
+            await manager.send_message(project_id, {
+                'type': 'error',
+                'message': f"Modification failed: {result.get('error')}",
+                'stage': 'modify'
+            })
+            
             return GenerateResponse(
                 success=False,
                 project_id=project_id,
@@ -238,7 +415,9 @@ async def generate_app(request: GenerateRequest):
     Main endpoint - generate iOS app from description
     """
     start_time = time.time()
-    project_id = str(uuid.uuid4())[:8]
+    # Use provided project_id if available (for WebSocket sync), otherwise generate new one
+    project_id = request.project_id if request.project_id else str(uuid.uuid4())[:8]
+    print(f"[API] Using project_id: {project_id} (provided: {request.project_id})")
     
     # Track active project
     active_projects[project_id] = {
@@ -246,6 +425,15 @@ async def generate_app(request: GenerateRequest):
         'started': datetime.now(),
         'description': request.description
     }
+    
+    # Create status callback for pipeline
+    async def status_callback(status_data):
+        print(f"[WebSocket] Sending message to {project_id}: {status_data}")
+        await manager.send_message(project_id, status_data)
+    
+    # Update the global pipeline's status callback for this request
+    print(f"[API] Setting pipeline callback for project {project_id}")
+    pipeline.status_callback = status_callback
     
     try:
         # Send initial status
@@ -369,11 +557,21 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             # Keep connection alive
             data = await websocket.receive_text()
             
-            # Echo back for now
-            await websocket.send_json({
-                'type': 'echo',
-                'message': data
-            })
+            # Handle cancel requests
+            message = json.loads(data) if data else {}
+            if message.get('type') == 'cancel':
+                # Signal cancellation to the pipeline
+                await websocket.send_json({
+                    'type': 'status',
+                    'message': 'Cancellation requested'
+                })
+                # You could add actual cancellation logic here
+            else:
+                # Echo back for other messages
+                await websocket.send_json({
+                    'type': 'echo',
+                    'message': data
+                })
             
     except WebSocketDisconnect:
         manager.disconnect(websocket, client_id)

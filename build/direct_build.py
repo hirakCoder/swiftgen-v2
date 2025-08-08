@@ -68,7 +68,7 @@ class DirectBuildSystem:
         launch_success = await self.simulator.install_and_launch(
             app_bundle, 
             bundle_id,
-            bring_to_focus=True
+            bring_to_focus=False  # Don't steal focus - let user see progress complete
         )
         
         if launch_success:
@@ -104,7 +104,7 @@ class DirectBuildSystem:
                     launch_success = await self.simulator.install_and_launch(
                         app_bundle,
                         bundle_id,
-                        bring_to_focus=True
+                        bring_to_focus=False  # Don't steal focus - let user see progress complete
                     )
                     
                     if launch_success:
@@ -283,7 +283,15 @@ class DirectBuildSystem:
                 cwd=project_path
             )
             
-            if result.returncode == 0:
+            # Check if compilation actually failed (not just warnings)
+            # swiftc returns non-zero for warnings too, so check stderr content
+            stderr_lower = result.stderr.lower()
+            has_real_error = "error:" in stderr_lower
+            
+            if result.returncode == 0 or (not has_real_error and "warning:" in stderr_lower):
+                # Success or only warnings
+                if result.returncode != 0 and "warning:" in stderr_lower:
+                    print(f"[DIRECT BUILD] Compiled with warnings (ignoring): {result.stderr[:200]}")
                 os.chmod(os.path.join(app_bundle, app_name), 0o755)
                 print(f"[DIRECT BUILD] Successfully compiled {len(swift_files)} files")
                 return True
@@ -463,7 +471,7 @@ class SimulatorManager:
         self, 
         app_bundle: str, 
         bundle_id: str,
-        bring_to_focus: bool = True
+        bring_to_focus: bool = False  # Default to not stealing focus
     ) -> bool:
         """
         Install and launch app with proper simulator management

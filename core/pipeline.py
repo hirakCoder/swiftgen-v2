@@ -42,10 +42,11 @@ class SwiftGenPipeline:
         'deploy': 30        # Simulator deployment
     }
     
-    def __init__(self, llm_service=None, build_service=None):
+    def __init__(self, llm_service=None, build_service=None, status_callback=None):
         self.intent_parser = IntentParser()
         self.llm_service = llm_service
         self.build_service = build_service
+        self.status_callback = status_callback  # WebSocket status callback
         
         # Circuit breakers for each component
         self.generation_circuit = CircuitBreaker(
@@ -67,6 +68,19 @@ class SwiftGenPipeline:
             'requests_failed': 0,
             'avg_duration': 0
         }
+    
+    async def send_status(self, message: str, stage: str = None):
+        """Send status update via callback if available"""
+        print(f"[Pipeline] {message}")
+        if self.status_callback:
+            print(f"[Pipeline] Sending WebSocket message for stage: {stage}")
+            await self.status_callback({
+                'type': 'status',
+                'message': message,
+                'stage': stage
+            })
+        else:
+            print(f"[Pipeline] No WebSocket callback set")
     
     async def process_request(
         self,
@@ -125,7 +139,7 @@ class SwiftGenPipeline:
         """
         Internal processing with stage-by-stage timeout
         """
-        print(f"[Pipeline] Starting request: {app_name} ({project_id})")
+        await self.send_status(f"Starting request: {app_name} ({project_id})", "analyze")
         
         # Stage 1: Parse Intent (2s timeout)
         try:
@@ -133,9 +147,9 @@ class SwiftGenPipeline:
                 self._parse_intent(description, app_name),
                 timeout=self.TIMEOUTS['intent']
             )
-            print(f"[Pipeline] Intent parsed: {intent.app_type.value}, features: {intent.core_features}")
+            await self.send_status(f"Intent parsed: {intent.app_type.value}, features: {intent.core_features}", "analyze")
         except asyncio.TimeoutError:
-            print("[Pipeline] Intent parsing timeout")
+            await self.send_status("Intent parsing timeout", "analyze")
             # Use basic defaults if parsing times out
             intent = AppIntent(
                 raw_request=description,
@@ -152,9 +166,9 @@ class SwiftGenPipeline:
                 self._generate_code,
                 intent
             )
-            print(f"[Pipeline] Code generated: {len(code.get('files', []))} files")
+            await self.send_status(f"Code generated: {len(code.get('files', []))} files", "generate")
         except CircuitBreakerError as e:
-            print(f"[Pipeline] Generation circuit open: {e}")
+            await self.send_status(f"Generation circuit open: {e}", "generate")
             return PipelineResult(
                 success=False,
                 project_id=project_id,
@@ -162,7 +176,7 @@ class SwiftGenPipeline:
                 fallback_action="try_again_later"
             )
         except Exception as e:
-            print(f"[Pipeline] Generation failed: {e}")
+            await self.send_status(f"Generation failed: {e}", "generate")
             return PipelineResult(
                 success=False,
                 project_id=project_id,
@@ -172,7 +186,7 @@ class SwiftGenPipeline:
         
         # Stage 3: Save Project Files
         project_path = await self._save_project(project_id, code)
-        print(f"[Pipeline] Project saved: {project_path}")
+        await self.send_status(f"Project saved: {project_path}", "build")
         
         # Stage 4: Build Project (30s timeout with circuit breaker)
         try:
@@ -183,7 +197,7 @@ class SwiftGenPipeline:
             )
             
             if build_result['success']:
-                print(f"[Pipeline] Build successful: {build_result.get('app_path')}")
+                await self.send_status(f"Build successful: {build_result.get('app_path')}", "launch")
                 return PipelineResult(
                     success=True,
                     project_id=project_id,
@@ -195,7 +209,7 @@ class SwiftGenPipeline:
                     }
                 )
             else:
-                print(f"[Pipeline] Build failed: {build_result.get('error')}")
+                await self.send_status(f"Build failed: {build_result.get('error')}", "build")
                 return PipelineResult(
                     success=False,
                     project_id=project_id,
@@ -205,7 +219,7 @@ class SwiftGenPipeline:
                 )
                 
         except CircuitBreakerError as e:
-            print(f"[Pipeline] Build circuit open: {e}")
+            await self.send_status(f"Build circuit open: {e}", "build")
             return PipelineResult(
                 success=False,
                 project_id=project_id,
@@ -214,7 +228,7 @@ class SwiftGenPipeline:
                 app_path=project_path
             )
         except Exception as e:
-            print(f"[Pipeline] Build error: {e}")
+            await self.send_status(f"Build error: {e}", "build")
             return PipelineResult(
                 success=False,
                 project_id=project_id,
