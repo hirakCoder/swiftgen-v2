@@ -1521,6 +1521,22 @@
             document.getElementById('projectIndicator').classList.add('hidden');
             document.getElementById('newAppBtn').classList.add('hidden');
             
+            // Clear all progress indicators
+            const progressBars = document.querySelectorAll('.progress-bar');
+            progressBars.forEach(bar => {
+                bar.style.display = 'none';
+                const fill = bar.querySelector('.progress-fill');
+                if (fill) {
+                    fill.style.width = '0%';
+                }
+            });
+            
+            // Clear stage indicators
+            const stageElements = document.querySelectorAll('[id$="-stage"]');
+            stageElements.forEach(el => {
+                el.classList.remove('active');
+            });
+            
             // Clear messages and show welcome screen
             const messagesEl = document.getElementById('messages');
             messagesEl.innerHTML = `
