@@ -97,6 +97,14 @@ class SwiftErrorAutoFixer:
                 description="Invalid @main attribute"
             ),
             
+            # iOS 17+ Components
+            ErrorPattern(
+                pattern=r"'ContentUnavailableView' is only available in iOS 17.0 or newer",
+                error_type=ErrorType.COMPILATION_ERROR,
+                fix_strategy="replace_content_unavailable_view",
+                description="ContentUnavailableView requires iOS 17+"
+            ),
+            
             # Syntax errors
             ErrorPattern(
                 pattern=r"expected '(\{|\}|\)|\])' in",
@@ -171,6 +179,8 @@ class SwiftErrorAutoFixer:
         elif error.fix_strategy == "add_framework":
             # Framework fixes are handled at compilation level
             return True
+        elif error.fix_strategy == "replace_content_unavailable_view":
+            content = self._replace_content_unavailable_view(content)
         
         if content != original_content:
             with open(file_path, 'w') as f:
@@ -262,6 +272,58 @@ class SwiftErrorAutoFixer:
         pattern = r'@main\s+struct\s+(\w+)(?!.*:\s*App)'
         replacement = r'@main\nstruct \1: App'
         return re.sub(pattern, replacement, content)
+    
+    def _replace_content_unavailable_view(self, content: str) -> str:
+        """Replace iOS 17+ ContentUnavailableView with iOS 16 compatible version"""
+        import re
+        
+        # Pattern 1: Simple ContentUnavailableView("Title", systemImage: "icon")
+        content = re.sub(
+            r'ContentUnavailableView\s*\(\s*"([^"]+)"\s*,\s*systemImage:\s*"([^"]+)"\s*\)',
+            r'''VStack(spacing: 20) {
+                Image(systemName: "\2")
+                    .font(.system(size: 50))
+                    .foregroundColor(.gray)
+                Text("\1")
+                    .font(.title2)
+                    .foregroundColor(.gray)
+            }''',
+            content
+        )
+        
+        # Pattern 2: ContentUnavailableView with description
+        content = re.sub(
+            r'ContentUnavailableView\s*\(\s*"([^"]+)"\s*,\s*systemImage:\s*"([^"]+)"\s*,\s*description:\s*Text\s*\(\s*"([^"]+)"\s*\)\s*\)',
+            r'''VStack(spacing: 20) {
+                Image(systemName: "\2")
+                    .font(.system(size: 50))
+                    .foregroundColor(.gray)
+                Text("\1")
+                    .font(.title2)
+                    .foregroundColor(.gray)
+                Text("\3")
+                    .font(.body)
+                    .foregroundColor(.gray.opacity(0.8))
+                    .multilineTextAlignment(.center)
+            }''',
+            content
+        )
+        
+        # Pattern 3: Generic ContentUnavailableView - replace with empty state
+        content = re.sub(
+            r'ContentUnavailableView[^)]*\)',
+            r'''VStack(spacing: 20) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 50))
+                    .foregroundColor(.gray)
+                Text("No Content Available")
+                    .font(.title2)
+                    .foregroundColor(.gray)
+            }''',
+            content
+        )
+        
+        return content
     
     def _fix_brackets(self, content: str) -> str:
         """Fix missing or mismatched brackets"""
