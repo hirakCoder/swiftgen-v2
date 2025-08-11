@@ -312,7 +312,48 @@ class DirectBuildSystem:
             else:
                 print(f"[DIRECT BUILD] Compilation failed, attempting auto-fix...")
                 
-                # First check for subdirectory issues
+                # First check learning system for known fixes
+                try:
+                    from core.learning_error_recovery import learning_recovery
+                    
+                    # Check if we've seen and fixed this before
+                    if learning_recovery.has_learned_fix(result.stderr):
+                        print("[DIRECT BUILD] Found learned fix for this error pattern")
+                        stats = learning_recovery.get_statistics()
+                        print(f"[DIRECT BUILD] Learning stats: {stats['total_successful_fixes']} successes, {stats['overall_success_rate']} success rate")
+                        
+                        # Apply learned fix to each file
+                        for file in swift_files:
+                            with open(file, 'r') as f:
+                                content = f.read()
+                            
+                            fixed_content = learning_recovery.apply_learned_fix(result.stderr, content)
+                            if fixed_content and fixed_content != content:
+                                with open(file, 'w') as f:
+                                    f.write(fixed_content)
+                                print(f"[DIRECT BUILD] Applied learned fix to {file}")
+                        
+                        # Try compilation again
+                        cmd = [
+                            'xcrun', 'swiftc',
+                            '-sdk', sdk_path,
+                            '-target', 'arm64-apple-ios16.0-simulator',
+                            '-o', os.path.join(app_bundle, app_name)
+                        ] + swift_files
+                        
+                        result = subprocess.run(cmd, capture_output=True, text=True)
+                        if result.returncode == 0:
+                            print("[DIRECT BUILD] ✅ Compilation successful with learned fix!")
+                            learning_recovery.learn_from_success(result.stderr, {"type": "learned_fix_applied"})
+                            os.chmod(os.path.join(app_bundle, app_name), 0o755)
+                            return True
+                        else:
+                            learning_recovery.learn_from_failure(result.stderr, {"type": "learned_fix_failed"})
+                    
+                except Exception as e:
+                    print(f"[DIRECT BUILD] Learning system error: {e}")
+                
+                # Check for subdirectory issues
                 try:
                     from core.subdirectory_error_handler import SubdirectoryErrorHandler
                     subdirectory_check = SubdirectoryErrorHandler.suggest_fix(result.stderr, project_path)
@@ -356,6 +397,15 @@ class DirectBuildSystem:
                         
                         if result.returncode == 0:
                             print("[DIRECT BUILD] ✅ Compilation successful after intelligent recovery!")
+                            # Learn from this success
+                            try:
+                                from core.learning_error_recovery import learning_recovery
+                                learning_recovery.learn_from_success(
+                                    result.stderr, 
+                                    {"type": "intelligent_recovery", "fixes": fix_result.get("fixes_applied", [])}
+                                )
+                            except:
+                                pass
                             os.chmod(os.path.join(app_bundle, app_name), 0o755)
                             return True
                         else:
