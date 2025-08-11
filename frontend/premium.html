@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwiftGen Pro - AI iOS Development Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@200;300;400;500;600;700;900&display=swap');
+        
+        * {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+        }
+        
+        :root {
+            --bg-primary: #000000;
+            --bg-secondary: #080808;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-tertiary: rgba(255, 255, 255, 0.4);
+            --accent: #007AFF;
+            --accent-glow: rgba(0, 122, 255, 0.4);
+            --success: #34C759;
+            --warning: #FF9500;
+            --danger: #FF3B30;
+        }
+        
+        body {
+            background: #000;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Animated gradient background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(0, 122, 255, 0.3) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 40%, rgba(255, 149, 0, 0.2) 0%, transparent 50%);
+            animation: gradientShift 30s ease infinite;
+            z-index: -2;
+        }
+        
+        @keyframes gradientShift {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(90deg) scale(1.1); }
+            50% { transform: rotate(180deg) scale(1); }
+            75% { transform: rotate(270deg) scale(1.1); }
+        }
+        
+        /* Glass morphism */
+        .glass {
+            background: var(--glass);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 122, 255, 0.1);
+        }
+        
+        .glass-dark {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(40px) saturate(200%);
+            -webkit-backdrop-filter: blur(40px) saturate(200%);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        /* Neon glow effects */
+        .neon-glow {
+            box-shadow: 0 0 20px var(--accent-glow),
+                       inset 0 0 20px rgba(0, 122, 255, 0.1);
+        }
+        
+        .neon-text {
+            text-shadow: 0 0 10px var(--accent-glow);
+        }
+        
+        /* Animated code background */
+        #codeRain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+        
+        #codeRain.active {
+            opacity: 0.6; /* Much more visible */
+        }
+        
+        #codeRain.progress-20 { opacity: 0.65; }
+        #codeRain.progress-40 { opacity: 0.7; }
+        #codeRain.progress-60 { opacity: 0.75; }
+        #codeRain.progress-80 { opacity: 0.8; }
+        #codeRain.progress-100 { opacity: 0.85; }
+        
+        #codeRain.completed {
+            opacity: 0.4; /* Keep visible after completion */
+            transition: opacity 2s ease;
+        }
+        
+        #codeRain.frozen {
+            opacity: 0.5 !important;
+        }
+        
+        #codeRain.frozen .code-line {
+            animation-play-state: paused !important;
+        }
+        
+        .code-line {
+            position: absolute;
+            color: #007AFF; /* Brighter blue */
+            font-family: 'SF Mono', monospace;
+            font-size: 14px; /* Larger text */
+            font-weight: 500; /* Slightly bolder */
+            white-space: nowrap;
+            opacity: 0;
+            animation: codeFall 8s linear infinite; /* Faster animation */
+            text-shadow: 0 0 5px rgba(0, 122, 255, 0.5); /* Glow effect */
+        }
+        
+        @keyframes codeFall {
+            0% {
+                transform: translateY(-100vh) translateX(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.8; /* Much more visible */
+            }
+            90% {
+                opacity: 0.8; /* Stay visible longer */
+            }
+            100% {
+                transform: translateY(100vh) translateX(20px);
+                opacity: 0;
+            }
+        }
+        
+        /* Premium button */
+        .btn-premium {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-premium::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s ease;
+        }
+        
+        .btn-premium:hover::before {
+            left: 100%;
+        }
+        
+        .btn-premium:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        /* Progress stages animation */
+        .stage-active {
+            animation: stagePulse 2s ease infinite;
+        }
+        
+        @keyframes stagePulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 var(--accent-glow);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 10px transparent;
+            }
+        }
+        
+        /* Loading dots */
+        .loading-dot {
+            animation: loadingBounce 1.4s infinite ease-in-out both;
+        }
+        
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes loadingBounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        
+        /* Smooth scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--glass-border);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-tertiary);
+        }
+        
+        /* Message animations */
+        .message-enter {
+            animation: messageSlide 0.4s ease forwards;
+        }
+        
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Success notification animation */
+        .animate-slide-up {
+            animation: slideUp 0.4s ease forwards;
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Simulator focus animation */
+        @keyframes simulatorFocus {
+            0% {
+                transform: scale(0.95);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        
+        .simulator-focus {
+            animation: simulatorFocus 0.5s ease forwards;
+        }
+        
+        /* Code preview animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+    <!-- Animated Code Rain Background -->
+    <div id="codeRain"></div>
+    
+    <!-- Top Navigation Bar -->
+    <nav class="glass-dark border-b border-white/5 px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center neon-glow">
+                    <i class="fab fa-swift text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-semibold text-white">SwiftGen Pro</h1>
+                    <p class="text-xs text-white/40">AI iOS Development Platform</p>
+                </div>
+            </div>
+            
+            <!-- Simulator Selection -->
+            <div class="flex items-center gap-2 ml-8">
+                <i class="fas fa-mobile-alt text-white/60 text-sm"></i>
+                <select id="simulatorSelect" class="glass rounded-lg px-3 py-1.5 text-sm text-white bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+                    <option value="">Loading simulators...</option>
+                </select>
+                <button id="bootSimulator" class="glass rounded-lg px-3 py-1.5 text-sm text-white/70 hover:text-white hover:bg-white/10 transition">
+                    <i class="fas fa-power-off mr-1"></i> Boot
+                </button>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <!-- New App Button (shown when project is active) -->
+            <button id="newAppBtn" class="hidden glass rounded-lg px-4 py-2 text-sm text-green-400 hover:bg-green-500/10 transition" onclick="startNewApp()">
+                <i class="fas fa-plus-circle mr-2"></i>New App
+            </button>
+            
+            <!-- Cancel Button (hidden by default) -->
+            <button id="cancelBtn" class="hidden glass rounded-lg px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition">
+                <i class="fas fa-stop-circle mr-2"></i>Stop
+            </button>
+            
+            <!-- Project Indicator -->
+            <div id="projectIndicator" class="hidden flex items-center gap-2 px-3 py-1.5 glass rounded-full mr-2">
+                <i class="fas fa-folder-open text-purple-400 text-xs"></i>
+                <span class="text-xs text-white/60">Project: <span id="projectName"></span></span>
+            </div>
+            
+            <!-- Status Indicator -->
+            <div id="connectionStatus" class="flex items-center gap-2 px-3 py-1.5 glass rounded-full">
+                <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                <span class="text-xs text-white/60">Ready</span>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Main Content Area -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Chat Area -->
+        <div class="flex-1 flex flex-col">
+            <!-- Messages Container -->
+            <div id="messagesContainer" class="flex-1 overflow-y-auto p-6">
+                <div id="messages" class="max-w-4xl mx-auto space-y-4">
+                    <!-- Welcome Screen -->
+                    <div class="text-center py-20">
+                        <div class="mb-8">
+                            <div class="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center neon-glow mb-6">
+                                <i class="fab fa-swift text-white text-5xl"></i>
+                            </div>
+                            <h2 class="text-4xl font-bold text-white mb-3">
+                                Build iOS Apps with AI
+                            </h2>
+                            <p class="text-lg text-white/60 max-w-md mx-auto">
+                                Describe your app idea and watch it come to life instantly
+                            </p>
+                        </div>
+                        
+                        <!-- Quick Start Templates -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto">
+                            <button onclick="quickStart('Simple timer app')" class="glass rounded-xl p-4 hover:bg-white/5 transition group">
+                                <i class="fas fa-stopwatch text-2xl text-blue-400 mb-2 group-hover:scale-110 transition"></i>
+                                <p class="text-sm text-white/80">Timer App</p>
+                            </button>
+                            <button onclick="quickStart('Simple todo list app')" class="glass rounded-xl p-4 hover:bg-white/5 transition group">
+                                <i class="fas fa-tasks text-2xl text-green-400 mb-2 group-hover:scale-110 transition"></i>
+                                <p class="text-sm text-white/80">Todo List</p>
+                            </button>
+                            <button onclick="quickStart('Simple weather app')" class="glass rounded-xl p-4 hover:bg-white/5 transition group">
+                                <i class="fas fa-cloud-sun text-2xl text-yellow-400 mb-2 group-hover:scale-110 transition"></i>
+                                <p class="text-sm text-white/80">Weather</p>
+                            </button>
+                            <button onclick="quickStart('Simple calculator app')" class="glass rounded-xl p-4 hover:bg-white/5 transition group">
+                                <i class="fas fa-calculator text-2xl text-purple-400 mb-2 group-hover:scale-110 transition"></i>
+                                <p class="text-sm text-white/80">Calculator</p>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Progress Indicator (hidden by default) -->
+            <div id="progressContainer" class="hidden">
+                <div class="glass-dark border-t border-white/5 p-4">
+                    <div class="max-w-4xl mx-auto">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-medium text-white">Building Your App</h3>
+                            <div class="flex items-center gap-3">
+                                <span id="progressTimer" class="text-xs text-white/40">0:00</span>
+                                <button onclick="toggleProgressDetails()" class="text-white/40 hover:text-white/60 transition">
+                                    <i class="fas fa-chevron-down text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Progress Stages -->
+                        <div id="progressStages" class="grid grid-cols-5 gap-2 mb-3">
+                            <div class="stage-item" data-stage="analyze">
+                                <div class="glass rounded-lg p-2 text-center">
+                                    <i class="fas fa-brain text-lg mb-1 text-white/40"></i>
+                                    <p class="text-xs text-white/40">Analyze</p>
+                                </div>
+                            </div>
+                            <div class="stage-item" data-stage="generate">
+                                <div class="glass rounded-lg p-2 text-center">
+                                    <i class="fas fa-code text-lg mb-1 text-white/40"></i>
+                                    <p class="text-xs text-white/40">Generate</p>
+                                </div>
+                            </div>
+                            <div class="stage-item" data-stage="build">
+                                <div class="glass rounded-lg p-2 text-center">
+                                    <i class="fas fa-hammer text-lg mb-1 text-white/40"></i>
+                                    <p class="text-xs text-white/40">Build</p>
+                                </div>
+                            </div>
+                            <div class="stage-item" data-stage="deploy">
+                                <div class="glass rounded-lg p-2 text-center">
+                                    <i class="fas fa-rocket text-lg mb-1 text-white/40"></i>
+                                    <p class="text-xs text-white/40">Deploy</p>
+                                </div>
+                            </div>
+                            <div class="stage-item" data-stage="launch">
+                                <div class="glass rounded-lg p-2 text-center">
+                                    <i class="fas fa-play text-lg mb-1 text-white/40"></i>
+                                    <p class="text-xs text-white/40">Launch</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Progress Bar -->
+                        <div class="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                            <div id="progressBar" class="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        
+                        <!-- Progress Details (collapsible) -->
+                        <div id="progressDetails" class="hidden mt-3 text-xs text-white/40 space-y-1">
+                            <div id="progressLog"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Input Area -->
+            <div class="glass-dark border-t border-white/5 p-4">
+                <div class="max-w-4xl mx-auto">
+                    <div class="flex gap-3">
+                        <div class="flex-1 relative">
+                            <input 
+                                id="messageInput"
+                                type="text" 
+                                placeholder="Describe your iOS app idea..."
+                                class="w-full glass rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-12"
+                                onkeydown="handleKeyDown(event)"
+                            >
+                            <button 
+                                id="sendBtn"
+                                onclick="sendMessage()"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center hover:scale-110 transition"
+                            >
+                                <i class="fas fa-paper-plane text-white text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Code Viewer (Right Panel) -->
+        <div id="codePanel" class="hidden w-96 glass-dark border-l border-white/5 flex flex-col">
+            <div class="p-4 border-b border-white/5">
+                <h3 class="text-sm font-medium text-white">Generated Code</h3>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4">
+                <pre id="codeViewer" class="text-xs text-white/60 font-mono"></pre>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // State Management
+        let ws = null;
+        let currentProjectId = null;
+        let currentRequest = null;
+        let progressTimer = null;
+        let progressStartTime = null;
+        let messageHistory = [];
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Initializing SwiftGen UI...');
+            loadSimulators();
+            // Don't setup WebSocket until we have a project ID
+            // setupWebSocket();
+            // Don't start code rain until first message
+        });
+        
+        // Load Available Simulators
+        async function loadSimulators() {
+            console.log('Loading simulators...');
+            try {
+                const response = await fetch('/api/simulators');
+                console.log('Simulator response:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const simulators = await response.json();
+                console.log('Simulators data:', simulators);
+                
+                const select = document.getElementById('simulatorSelect');
+                select.innerHTML = '<option value="">Auto-select</option>';
+                
+                // Add booted simulators
+                if (simulators.booted && simulators.booted.length > 0) {
+                    simulators.booted.forEach(sim => {
+                        const option = document.createElement('option');
+                        option.value = sim.udid;
+                        option.textContent = `${sim.name} (Running)`;
+                        option.dataset.state = 'Booted';
+                        select.appendChild(option);
+                    });
+                }
+                
+                // Add shutdown simulators
+                if (simulators.available && simulators.available.length > 0) {
+                    simulators.available.forEach(sim => {
+                        if (sim.state !== 'Booted') {
+                            const option = document.createElement('option');
+                            option.value = sim.udid;
+                            option.textContent = sim.name;
+                            option.dataset.state = sim.state;
+                            select.appendChild(option);
+                        }
+                    });
+                }
+                
+                // Add real devices
+                if (simulators.devices && simulators.devices.length > 0) {
+                    simulators.devices.forEach(device => {
+                        const option = document.createElement('option');
+                        option.value = device.udid;
+                        option.textContent = `📱 ${device.name} (Device)`;
+                        option.dataset.type = 'device';
+                        select.appendChild(option);
+                    });
+                }
+                
+                // If no simulators found, show a message
+                if (select.options.length === 1) {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'No simulators available';
+                    select.appendChild(option);
+                }
+            } catch (error) {
+                console.error('Failed to load simulators:', error);
+                const select = document.getElementById('simulatorSelect');
+                select.innerHTML = '<option value="">Error loading simulators</option>';
+            }
+        }
+        
+        // Boot Simulator
+        document.getElementById('bootSimulator').addEventListener('click', async () => {
+            const select = document.getElementById('simulatorSelect');
+            const selectedUdid = select.value;
+            
+            if (!selectedUdid) {
+                alert('Please select a simulator first');
+                return;
+            }
+            
+            const option = select.options[select.selectedIndex];
+            if (option.dataset.state === 'Booted') {
+                alert('Simulator is already running');
+                return;
+            }
+            
+            try {
+                const btn = document.getElementById('bootSimulator');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Booting...';
+                
+                const response = await fetch('/api/simulator/boot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ udid: selectedUdid })
+                });
+                
+                if (response.ok) {
+                    await loadSimulators(); // Refresh list
+                    alert('Simulator booted successfully');
+                } else {
+                    alert('Failed to boot simulator');
+                }
+            } catch (error) {
+                alert('Error booting simulator');
+            } finally {
+                const btn = document.getElementById('bootSimulator');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-power-off mr-1"></i> Boot';
+            }
+        });
+        
+        // WebSocket Setup
+        function setupWebSocket() {
+            if (!currentProjectId) return;
+            
+            ws = new WebSocket(`ws://localhost:8000/ws/${currentProjectId}`);
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+            
+            ws.onclose = () => {
+                updateConnectionStatus('Disconnected', 'red');
+                ws = null;
+            };
+            
+            ws.onerror = () => {
+                updateConnectionStatus('Error', 'red');
+            };
+            
+            ws.onopen = () => {
+                updateConnectionStatus('Connected', 'green');
+            };
+        }
+        
+        // Handle WebSocket Messages
+        function handleWebSocketMessage(data) {
+            if (data.type === 'status') {
+                const message = data.message.toLowerCase();
+                const stage = data.stage;
+                
+                // Check if this is a modification by looking for reload stage
+                const isModification = document.querySelector('[data-stage="reload"]') !== null;
+                
+                // Update progress based on stage
+                console.log(`[WebSocket] Processing stage: ${stage}, isModification: ${isModification}`);
+                
+                if (stage === 'analyze') {
+                    updateProgress('analyze', 'active', 'Analyzing requirements...');
+                } else if (stage === 'modify') {
+                    // Handle modify stage explicitly for modifications
+                    updateProgress('analyze', 'completed');
+                    updateProgress('modify', 'active', 'Modifying code...');
+                } else if (stage === 'generate') {
+                    // Handle generate stage for new apps
+                    updateProgress('analyze', 'completed');
+                    updateProgress('generate', 'active', 'Generating code with AI...');
+                } else if (stage === 'build') {
+                    // Complete the previous stage based on what exists
+                    if (document.querySelector('[data-stage="modify"]')) {
+                        updateProgress('modify', 'completed');
+                    } else if (document.querySelector('[data-stage="generate"]')) {
+                        updateProgress('generate', 'completed');
+                    }
+                    updateProgress('build', 'active', 'Building app...');
+                } else if (stage === 'deploy') {
+                    updateProgress('build', 'completed');
+                    updateProgress('deploy', 'active', 'Deploying to simulator...');
+                } else if (stage === 'reload') {
+                    // Handle reload stage for modifications
+                    updateProgress('deploy', 'completed');
+                    updateProgress('reload', 'active', 'Reloading app...');
+                    // Don't complete progress yet, wait for success message
+                } else if (stage === 'launch') {
+                    // Handle launch stage for new apps
+                    updateProgress('deploy', 'completed');
+                    updateProgress('launch', 'active', 'Launching app...');
+                    // Don't complete progress yet, wait for success message
+                }
+                
+                // Check message content for specific updates
+                if (message.includes('simulator')) {
+                    if (message.includes('booting')) {
+                        updateProgress('deploy', 'active', 'Booting simulator...');
+                    } else if (message.includes('installing')) {
+                        updateProgress('deploy', 'active', 'Installing app...');
+                    } else if (message.includes('launched')) {
+                        updateProgress('launch', 'completed');
+                        // Don't focus - let user see the progress completion
+                        completeProgress(true);
+                        console.log('[UI] App launched - progress complete, user can view simulator when ready');
+                    }
+                }
+                
+                // Check for specific build errors (not just any message with 'error' word)
+                // But DON'T mark as error yet - let the HTTP response decide final status
+                if ((message.includes('Build failed') || message.includes('Failed to compile')) && data.type === 'status') {
+                    console.warn('Build issue detected via WebSocket:', message);
+                    // Don't mark as error yet - the backend might recover
+                    // The HTTP response will have the final status
+                    return;
+                }
+                
+                // Add to progress log with timestamp
+                const timestamp = new Date().toLocaleTimeString();
+                addProgressLog(`[${timestamp}] ${data.message}`);
+            } else if (data.type === 'success') {
+                console.log('[WebSocket] Success message received');
+                // Complete the last stage based on what exists
+                if (document.querySelector('[data-stage="reload"]')) {
+                    updateProgress('reload', 'completed');
+                } else if (document.querySelector('[data-stage="launch"]')) {
+                    updateProgress('launch', 'completed');
+                }
+                completeProgress(true);
+                
+                // Don't focus on simulator - let user see the completed progress
+                // User can switch to simulator manually when ready
+                console.log('[UI] App launched successfully - keeping focus on progress indicator');
+            } else if (data.type === 'error') {
+                // Mark the current stage as error
+                const activeStage = document.querySelector('.stage-active');
+                if (activeStage) {
+                    const stage = activeStage.dataset.stage;
+                    updateProgress(stage, 'error');
+                }
+                completeProgress(false);
+            }
+        }
+        
+        // Extract app name from message
+        function extractAppName(message) {
+            const match = message.match(/(\w+)\s*app/i);
+            return match ? match[1] : 'Your app';
+        }
+        
+        // Generate intelligent response based on request
+        function generateIntelligentResponse(request, appName, result) {
+            const templates = [
+                `✨ Perfect! I've created your ${appName} app and it's now running in the simulator. The app includes all the features you requested and follows Apple's design guidelines.`,
+                `🎉 Your ${appName} app is ready! I've implemented everything you asked for with a clean, modern SwiftUI interface. Check it out in the simulator!`,
+                `🚀 Success! The ${appName} app has been built and deployed. I've added some extra polish to make it feel premium and responsive.`,
+                `✅ All done! Your ${appName} app is live in the simulator. I've optimized the UI for a smooth user experience and added intuitive interactions.`
+            ];
+            
+            // Choose response based on request content
+            if (request.includes('timer')) {
+                return `⏱️ Your Timer app is ready! I've created a beautiful countdown timer with start, pause, and reset functionality. The UI features smooth animations and haptic feedback for a premium feel.`;
+            } else if (request.includes('todo')) {
+                return `📝 Your Todo app is complete! It features task creation, editing, completion tracking, and persistence. The interface is clean and intuitive with smooth transitions.`;
+            } else if (request.includes('weather')) {
+                return `☀️ Your Weather app is live! It displays current conditions with beautiful gradients and animations. The UI adapts to different weather conditions for an immersive experience.`;
+            } else if (request.includes('calculator')) {
+                return `🧮 Your Calculator app is ready! I've implemented a fully functional calculator with history tracking and a clean, Apple-inspired design.`;
+            } else if (request.includes('meditation') || request.includes('mindfulness')) {
+                return `🧘 Your Meditation app is ready! It features calming animations, breathing exercises, and a serene UI designed to promote relaxation and mindfulness.`;
+            } else if (request.includes('tracker') || request.includes('beer')) {
+                return `🍺 Your Tracker app is live! I've added fun animations and witty messages to make tracking enjoyable. The app saves your data and includes entertaining statistics.`;
+            }
+            
+            // Default intelligent response
+            return templates[Math.floor(Math.random() * templates.length)];
+        }
+        
+        // Generate error response
+        function generateErrorResponse(error) {
+            if (!error) return '❌ Something went wrong. Please try again.';
+            
+            if (error.includes('timeout')) {
+                return '⏱️ The build took longer than expected. Try simplifying your request or check if Xcode is responding.';
+            } else if (error.includes('simulator')) {
+                return '📱 There was an issue with the simulator. Make sure a simulator is running or select one from the dropdown above.';
+            } else if (error.includes('compile') || error.includes('build')) {
+                return '🔨 The build encountered an error. I will need to adjust the code. Try describing your app differently or with simpler features.';
+            } else if (error.includes('LLM') || error.includes('API')) {
+                return '🤖 The AI service is temporarily unavailable. Please wait a moment and try again.';
+            }
+            
+            return `❌ Error: ${error}. Let me know if you'd like to try a different approach.`;
+        }
+        
+        // Send Message
+        async function sendMessage() {
+            console.log('sendMessage called');
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            console.log('Message:', message);
+            if (!message) {
+                console.log('Empty message, returning');
+                return;
+            }
+            
+            // Show user message
+            addMessage('user', message);
+            input.value = '';
+            
+            // Add to message history
+            messageHistory.push({ role: 'user', content: message });
+            
+            // Show immediate assistant response with building animation
+            const buildingMessages = [
+                '🛠️ Analyzing your requirements...',
+                '🎨 Designing the UI with SwiftUI...',
+                '⚡ Implementing core functionality...',
+                '🔧 Setting up view models and data flow...',
+                '✨ Adding animations and polish...',
+                '📦 Packaging your app...',
+                '🚀 Preparing for launch...'
+            ];
+            
+            const randomMessage = buildingMessages[Math.floor(Math.random() * 3)];
+            addBuildingMessage(randomMessage);
+            
+            // Simple modification detection like chat.html
+            // If we have a currentProjectId, it's a modification
+            // Otherwise, it's a new app generation
+            const isModification = currentProjectId !== null && currentProjectId !== undefined && currentProjectId !== '';
+            
+            // Show progress with correct stages for modification vs generation
+            if (isModification) {
+                showProgressForModification();
+            } else {
+                showProgress();
+            }
+            showCancelButton();
+            
+            // Resume code rain effect for new request
+            resumeCodeRain();
+            
+            try {
+                console.log('Sending request...');
+                
+                const endpoint = isModification ? '/api/modify' : '/api/generate';
+                console.log(`Request type: ${isModification ? 'MODIFICATION' : 'CREATION'}, Project ID: ${currentProjectId}`);
+                
+                // Get selected simulator
+                const simulatorSelect = document.getElementById('simulatorSelect');
+                const selectedSimulator = simulatorSelect.value;
+                
+                // Handle app name differently for modifications vs new apps
+                let appName = 'MyApp';
+                
+                if (isModification) {
+                    // For modifications, DON'T extract from message - use existing app name
+                    const projectNameEl = document.getElementById('projectName');
+                    if (projectNameEl && projectNameEl.textContent) {
+                        appName = projectNameEl.textContent;
+                        console.log('[MODIFICATION] Using existing app name:', appName);
+                    } else {
+                        // Try to get from previous messages or use a default
+                        appName = 'App';  // Generic name for modifications
+                        console.log('[MODIFICATION] No project name found, using default:', appName);
+                    }
+                    console.log('[MODIFICATION] Request description:', message);
+                } else {
+                    // For new apps, extract app name from message
+                    console.log('[NEW APP] Extracting app name from:', message);
+                    
+                    // Pattern 1: "X app" or "X application"
+                    let match = message.match(/(\w+)\s+(?:app|application)/i);
+                    
+                    // Pattern 2: "app called X" or "app named X"
+                    if (!match) {
+                        match = message.match(/(?:app|application)(?:\s+called|\s+named)?\s+[\"']?(\w+)/i);
+                    }
+                    
+                    // Pattern 3: "Create a/an X" where X is likely the app type
+                    if (!match) {
+                        match = message.match(/(?:create|build|make|develop)\s+(?:a|an)\s+(\w+)/i);
+                    }
+                    
+                    if (match) {
+                        appName = match[1];
+                    } else {
+                        // Smart fallback: Find the first noun-like word that's not a common verb/article
+                        const skipWords = ['create', 'build', 'make', 'develop', 'design', 'app', 'application', 
+                                          'with', 'that', 'which', 'for', 'the', 'a', 'an', 'and', 'or', 'simple'];
+                        const words = message.toLowerCase().split(/\s+/);
+                        
+                        for (const word of words) {
+                            const cleanWord = word.replace(/[^a-zA-Z0-9]/g, '');
+                            if (cleanWord.length > 2 && !skipWords.includes(cleanWord)) {
+                                appName = cleanWord;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Clean and capitalize the app name
+                    appName = appName.replace(/[^a-zA-Z0-9]/g, '');
+                    appName = appName.charAt(0).toUpperCase() + appName.slice(1).toLowerCase();
+                    console.log('[NEW APP] Extracted app name:', appName);
+                }
+                
+                // Generate project ID for WebSocket connection BEFORE creating request body
+                // For new apps, always generate a new ID
+                // For modifications, keep the existing project ID
+                if (!isModification && !currentProjectId) {
+                    // Only generate new ID for new apps
+                    currentProjectId = Math.random().toString(36).substring(2, 10);
+                    console.log('Generated NEW project ID for new app:', currentProjectId);
+                    
+                    // Close existing WebSocket if any
+                    if (ws) {
+                        ws.close();
+                        ws = null;
+                    }
+                } else if (isModification && !currentProjectId) {
+                    // This shouldn't happen - modification without a project ID
+                    console.error('[ERROR] Modification attempted without a project ID!');
+                    addMessage('assistant', 'Error: No existing app to modify. Please create an app first.');
+                    return;
+                } else if (isModification) {
+                    console.log('Using EXISTING project ID for modification:', currentProjectId);
+                }
+                
+                // Setup WebSocket with the correct project ID BEFORE creating request body
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    console.log('Setting up WebSocket with project ID:', currentProjectId);
+                    setupWebSocket();
+                    // Give WebSocket time to connect
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+                
+                // Send request with project_id for WebSocket sync
+                const requestBody = isModification ? {
+                    project_id: currentProjectId,
+                    description: message,
+                    app_name: appName
+                } : {
+                    description: message,  // Send the original message as-is
+                    app_name: appName,
+                    project_id: currentProjectId  // Need this for WebSocket sync
+                };
+                
+                console.log('Request body:', JSON.stringify(requestBody, null, 2));
+                console.log('Endpoint:', endpoint);
+                
+                const controller = new AbortController();
+                currentRequest = controller;
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody),
+                    signal: controller.signal
+                });
+                
+                const result = await response.json();
+                console.log('Response from backend:', JSON.stringify(result, null, 2));
+                
+                if (result.project_id) {
+                    // Always use the backend's project ID as the source of truth
+                    if (result.project_id !== currentProjectId) {
+                        console.log('Updating project ID from', currentProjectId, 'to', result.project_id);
+                    }
+                    currentProjectId = result.project_id;
+                    console.log('Current project ID is now:', currentProjectId);
+                }
+                
+                // Show intelligent response
+                if (result.success) {
+                    // Remove building message first
+                    removeBuildingMessage();
+                    
+                    // Use the message from backend if it's a modification, otherwise generate
+                    let responseMessage;
+                    if (isModification && result.message) {
+                        console.log('[MODIFY] Using backend message for modification');
+                        console.log('[MODIFY] Message:', result.message);
+                        responseMessage = result.message;
+                    } else {
+                        const appName = extractAppName(message);
+                        responseMessage = generateIntelligentResponse(message, appName, result);
+                    }
+                    console.log('[RESPONSE] Final message to display:', responseMessage);
+                    addMessage('assistant', responseMessage);
+                    // Add to message history
+                    messageHistory.push({ role: 'assistant', content: responseMessage });
+                    
+                    // Show project indicator and new app button
+                    if (!isModification) {
+                        document.getElementById('projectIndicator').classList.remove('hidden');
+                        document.getElementById('projectName').textContent = appName;
+                        document.getElementById('newAppBtn').classList.remove('hidden');
+                    }
+                    
+                    if (result.code) {
+                        showCode(result.code);
+                    }
+                } else {
+                    // Remove building message first
+                    removeBuildingMessage();
+                    
+                    const errorResponse = generateErrorResponse(result.error || 'Build failed. Please try again.');
+                    addMessage('assistant', errorResponse);
+                    // Add error to history too
+                    messageHistory.push({ role: 'assistant', content: errorResponse });
+                    // Mark build as failed in progress indicator
+                    updateProgress('build', 'error');
+                    completeProgress(false);
+                }
+            } catch (error) {
+                // Remove building message first
+                removeBuildingMessage();
+                
+                if (error.name === 'AbortError') {
+                    addMessage('assistant', 'Request cancelled');
+                } else {
+                    addMessage('assistant', `Error: ${error.message}`);
+                }
+            } finally {
+                hideCancelButton();
+                // Don't hide progress immediately - let user review it
+                // hideProgress();
+                // Keep code rain visible after completion
+                setTimeout(() => {
+                    const codeRain = document.getElementById('codeRain');
+                    codeRain.classList.remove('progress-20', 'progress-40', 'progress-60', 'progress-80', 'progress-100');
+                    codeRain.classList.add('completed'); // Keep it visible with completed class
+                }, 3000);
+                currentRequest = null;
+            }
+        }
+        
+        // Cancel Current Request
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            if (currentRequest) {
+                currentRequest.abort();
+                if (ws) {
+                    ws.send(JSON.stringify({ type: 'cancel' }));
+                }
+            }
+        });
+        
+        // Progress Management
+        function showProgress() {
+            // Don't recreate stages - they exist in HTML already
+            // Just show the container and reset stages
+            document.getElementById('progressContainer').classList.remove('hidden');
+            startProgressTimer();
+            resetProgressStages();
+            updateProgress('analyze', 'active', 'Understanding requirements...');
+        }
+        
+        function showProgressForModification() {
+            // Show modification-specific stages
+            const stages = ['analyze', 'modify', 'build', 'deploy', 'reload'];
+            const container = document.getElementById('progressStages');
+            if (container) {
+                container.innerHTML = stages.map(stage => {
+                    const icons = {
+                        analyze: 'fa-magnifying-glass',
+                        modify: 'fa-code',
+                        build: 'fa-hammer',
+                        deploy: 'fa-rocket',
+                        reload: 'fa-rotate'
+                    };
+                    const labels = {
+                        analyze: 'Analyzing',
+                        modify: 'Modifying',
+                        build: 'Rebuilding',
+                        deploy: 'Deploying',
+                        reload: 'Reloading'
+                    };
+                    return `
+                        <div class="stage-item" data-stage="${stage}">
+                            <i class="fas ${icons[stage]} text-white/40"></i>
+                            <p class="text-xs text-white/40">${labels[stage]}</p>
+                        </div>
+                    `;
+                }).join('');
+            }
+            document.getElementById('progressContainer').classList.remove('hidden');
+            startProgressTimer();
+            updateProgress('analyze', 'active', 'Analyzing changes...');
+        }
+        
+        function hideProgress() {
+            // Keep progress visible for user to review
+            // Only hide on next request or user action
+            stopProgressTimer();
+        }
+        
+        function updateProgress(stage, status, message) {
+            const stageEl = document.querySelector(`[data-stage="${stage}"]`);
+            if (!stageEl) return;
+            
+            // Find icon and text within the nested structure
+            const glassDiv = stageEl.querySelector('.glass') || stageEl;
+            const icon = glassDiv.querySelector('i');
+            const text = glassDiv.querySelector('p');
+            
+            if (!icon || !text) return;
+            
+            // Reset classes
+            stageEl.classList.remove('stage-active');
+            glassDiv.classList.remove('ring-2', 'ring-blue-400', 'ring-green-400', 'ring-red-400');
+            icon.classList.remove('text-white/40', 'text-blue-400', 'text-green-400', 'text-red-400');
+            text.classList.remove('text-white/40', 'text-blue-400', 'text-green-400', 'text-red-400');
+            
+            if (status === 'active') {
+                stageEl.classList.add('stage-active');
+                glassDiv.classList.add('ring-2', 'ring-blue-400');
+                icon.classList.add('text-blue-400');
+                text.classList.add('text-blue-400');
+            } else if (status === 'completed') {
+                glassDiv.classList.add('ring-2', 'ring-green-400');
+                icon.classList.add('text-green-400');
+                text.classList.add('text-green-400');
+            } else if (status === 'error') {
+                glassDiv.classList.add('ring-2', 'ring-red-400');
+                icon.classList.add('text-red-400');
+                text.classList.add('text-red-400');
+            } else {
+                icon.classList.add('text-white/40');
+                text.classList.add('text-white/40');
+            }
+            
+            // Update progress bar - handle both generation and modification stages
+            const isModification = document.querySelector('[data-stage="modify"]') !== null;
+            const stages = isModification 
+                ? ['analyze', 'modify', 'build', 'deploy', 'reload']
+                : ['analyze', 'generate', 'build', 'deploy', 'launch'];
+            const currentIndex = stages.indexOf(stage);
+            const progress = ((currentIndex + (status === 'completed' ? 1 : 0.5)) / stages.length) * 100;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+            
+            // Update code rain opacity based on progress
+            const codeRain = document.getElementById('codeRain');
+            codeRain.classList.remove('progress-20', 'progress-40', 'progress-60', 'progress-80', 'progress-100');
+            if (progress >= 80) codeRain.classList.add('progress-80');
+            else if (progress >= 60) codeRain.classList.add('progress-60');
+            else if (progress >= 40) codeRain.classList.add('progress-40');
+            else if (progress >= 20) codeRain.classList.add('progress-20');
+            
+            // Show message if provided
+            if (message) {
+                const currentStage = document.querySelector('.stage-item.stage-active p');
+                if (currentStage) {
+                    currentStage.textContent = message.split('...')[0].substring(0, 15);
+                }
+            }
+        }
+        
+        function resetProgressStages() {
+            document.querySelectorAll('.stage-item').forEach(el => {
+                el.classList.remove('stage-active');
+                const glassDiv = el.querySelector('.glass') || el;
+                if (glassDiv) {
+                    glassDiv.classList.remove('ring-2', 'ring-blue-400', 'ring-green-400', 'ring-red-400');
+                }
+                const icon = el.querySelector('i');
+                const text = el.querySelector('p');
+                if (icon) {
+                    icon.className = icon.className.replace(/text-\S+/g, 'text-white/40');
+                }
+                if (text) {
+                    text.className = 'text-xs text-white/40';
+                }
+            });
+            const progressBar = document.getElementById('progressBar');
+            if (progressBar) progressBar.style.width = '0%';
+            const progressLog = document.getElementById('progressLog');
+            if (progressLog) progressLog.innerHTML = '';
+        }
+        
+        function startProgressTimer() {
+            progressStartTime = Date.now();
+            progressTimer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - progressStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('progressTimer').textContent = 
+                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+        
+        function stopProgressTimer() {
+            if (progressTimer) {
+                clearInterval(progressTimer);
+                progressTimer = null;
+            }
+        }
+        
+        function addProgressLog(message) {
+            const log = document.getElementById('progressLog');
+            const entry = document.createElement('div');
+            entry.textContent = message;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function toggleProgressDetails() {
+            document.getElementById('progressDetails').classList.toggle('hidden');
+        }
+        
+        function completeProgress(success) {
+            console.log('[PROGRESS] Completing progress, success:', success);
+            if (success) {
+                // Update the last stage based on what's present
+                const lastStage = document.querySelector('[data-stage="reload"]') ? 'reload' : 'launch';
+                updateProgress(lastStage, 'completed');
+                // Make sure ALL stages stop blinking
+                document.querySelectorAll('.stage-item').forEach(el => {
+                    el.classList.remove('stage-active');
+                });
+                
+                // Show success notification without stealing focus
+                showSuccessNotification();
+            }
+            stopProgressTimer();
+            
+            // Immediately freeze code rain - no delay needed
+            console.log('[PROGRESS] Calling freezeCodeRain');
+            freezeCodeRain();
+            
+            // Keep progress visible for review
+            document.getElementById('progressContainer').classList.remove('hidden');
+        }
+        
+        function freezeCodeRain() {
+            const codeRain = document.getElementById('codeRain');
+            if (!codeRain) {
+                console.log('[CODE RAIN] Element not found');
+                return;
+            }
+            
+            console.log('[CODE RAIN] Freezing animation, interval:', codeRainInterval);
+            
+            // Stop generating new lines
+            if (codeRainInterval) {
+                console.log('[CODE RAIN] Clearing interval');
+                clearInterval(codeRainInterval);
+                codeRainInterval = null;
+            }
+            
+            // Remove active class and add frozen
+            codeRain.classList.remove('active');
+            codeRain.classList.add('frozen');
+            
+            // Freeze all existing code lines at their current position
+            const codeLines = codeRain.querySelectorAll('.code-line');
+            console.log('[CODE RAIN] Freezing', codeLines.length, 'lines');
+            
+            codeLines.forEach(line => {
+                // Stop animation immediately
+                line.style.animationPlayState = 'paused';
+                line.classList.add('frozen-line');
+            });
+            
+            // Add visual indicator that rain is frozen
+            codeRain.style.opacity = '0.3';
+            codeRain.classList.add('completed');
+            console.log('[CODE RAIN] Freeze complete');
+        }
+        
+        function resumeCodeRain() {
+            const codeRain = document.getElementById('codeRain');
+            if (!codeRain) return;
+            
+            console.log('[CODE RAIN] Resuming animation');
+            
+            // Clear frozen lines to start fresh
+            codeRain.innerHTML = '';
+            
+            // Remove frozen class and add active
+            codeRain.classList.remove('frozen');
+            codeRain.classList.add('active');
+            
+            // Restart the interval (this handles first time too)
+            if (!codeRainInterval) {
+                startCodeRain();
+            }
+        }
+        
+        // UI Helpers
+        function addMessage(role, content) {
+            const messagesEl = document.getElementById('messages');
+            
+            // Clear welcome screen
+            if (messagesEl.querySelector('.text-center')) {
+                messagesEl.innerHTML = '';
+            }
+            
+            const messageEl = document.createElement('div');
+            messageEl.className = `flex gap-3 message-enter ${role === 'user' ? 'justify-end' : ''}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = `max-w-2xl ${role === 'user' ? 'glass' : 'glass-dark'} rounded-2xl p-4`;
+            
+            // Parse markdown for assistant messages
+            let formattedContent = content;
+            if (role === 'assistant') {
+                // Convert markdown bold to HTML
+                formattedContent = content
+                    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>')
+                    .replace(/\n/g, '<br>')
+                    .replace(/• /g, '• ');
+            }
+            
+            bubble.innerHTML = `
+                <div class="flex items-start gap-3">
+                    ${role === 'assistant' ? '<i class="fas fa-robot text-blue-400 mt-1"></i>' : ''}
+                    <div class="text-sm text-white/80">${formattedContent}</div>
+                    ${role === 'user' ? '<i class="fas fa-user text-purple-400 mt-1"></i>' : ''}
+                </div>
+            `;
+            
+            messageEl.appendChild(bubble);
+            messagesEl.appendChild(messageEl);
+            
+            // Scroll to bottom
+            document.getElementById('messagesContainer').scrollTop = 
+                document.getElementById('messagesContainer').scrollHeight;
+        }
+        
+        // Add building message with Xcode-style animation
+        function addBuildingMessage(initialMessage) {
+            const messagesEl = document.getElementById('messages');
+            
+            // Clear welcome screen
+            if (messagesEl.querySelector('.text-center')) {
+                messagesEl.innerHTML = '';
+            }
+            
+            const messageEl = document.createElement('div');
+            messageEl.className = 'flex gap-3 message-enter';
+            messageEl.id = 'buildingMessage';
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'max-w-2xl glass-dark rounded-2xl p-4';
+            bubble.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fab fa-swift text-blue-400 text-xl"></i>
+                        <div class="flex gap-1">
+                            <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                            <div class="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
+                            <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style="animation-delay: 0.4s"></div>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="text-sm text-white/80" id="buildingText">${initialMessage}</div>
+                        <div class="mt-2 font-mono text-xs text-blue-400/60 overflow-hidden" id="codePreview" style="max-height: 0; transition: max-height 0.5s ease">
+                            <span class="opacity-0" style="animation: fadeIn 0.5s forwards">struct</span>
+                            <span class="opacity-0" style="animation: fadeIn 0.5s 0.2s forwards"> ContentView:</span>
+                            <span class="opacity-0" style="animation: fadeIn 0.5s 0.4s forwards"> View {</span>
+                            <span class="opacity-0" style="animation: fadeIn 0.5s 0.6s forwards"> ... }</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            messageEl.appendChild(bubble);
+            messagesEl.appendChild(messageEl);
+            
+            // Show code preview after a moment
+            setTimeout(() => {
+                document.getElementById('codePreview').style.maxHeight = '50px';
+            }, 500);
+            
+            // Update the message periodically
+            const messages = [
+                '🎨 Crafting your SwiftUI interface...',
+                '⚙️ Wiring up the data flow...',
+                '🔨 Building with Xcode...',
+                '📱 Preparing for the simulator...'
+            ];
+            
+            let messageIndex = 0;
+            const updateInterval = setInterval(() => {
+                if (document.getElementById('buildingText')) {
+                    document.getElementById('buildingText').textContent = messages[messageIndex % messages.length];
+                    messageIndex++;
+                } else {
+                    clearInterval(updateInterval);
+                }
+            }, 2000);
+            
+            // Store interval ID to clear later
+            window.buildingMessageInterval = updateInterval;
+            
+            // Scroll to bottom
+            document.getElementById('messagesContainer').scrollTop = 
+                document.getElementById('messagesContainer').scrollHeight;
+        }
+        
+        // Remove building message when done
+        function removeBuildingMessage() {
+            const buildingMsg = document.getElementById('buildingMessage');
+            if (buildingMsg) {
+                buildingMsg.remove();
+            }
+            if (window.buildingMessageInterval) {
+                clearInterval(window.buildingMessageInterval);
+            }
+        }
+        
+        function showCancelButton() {
+            document.getElementById('cancelBtn').classList.remove('hidden');
+        }
+        
+        function hideCancelButton() {
+            document.getElementById('cancelBtn').classList.add('hidden');
+        }
+        
+        function updateConnectionStatus(status, color) {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.innerHTML = `
+                <div class="w-2 h-2 rounded-full bg-${color}-500"></div>
+                <span class="text-xs text-white/60">${status}</span>
+            `;
+        }
+        
+        function showSuccessNotification() {
+            // Show a subtle notification that app is ready
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-8 right-8 glass rounded-xl px-6 py-4 text-white z-50 animate-slide-up';
+            notification.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                        <i class="fas fa-check text-green-400"></i>
+                    </div>
+                    <div>
+                        <p class="font-semibold text-white">App Ready!</p>
+                        <p class="text-sm text-white/60">Your app is running in the iOS Simulator</p>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(notification);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                notification.style.transition = 'all 0.5s';
+                notification.style.transform = 'translateY(100px)';
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 500);
+            }, 5000);
+        }
+        
+        function focusOnSimulator() {
+            // This function is now deprecated - we don't steal focus
+            console.log('[UI] focusOnSimulator called but focus stealing is disabled');
+        }
+        
+        function showCode(code) {
+            document.getElementById('codePanel').classList.remove('hidden');
+            document.getElementById('codeViewer').textContent = code;
+        }
+        
+        // Code Rain Effect
+        let codeRainInterval = null;
+        
+        function startCodeRain() {
+            const codeRain = document.getElementById('codeRain');
+            const codeSnippets = [
+                'struct ContentView: View {',
+                '@State private var',
+                'NavigationView {',
+                'VStack(spacing: 20) {',
+                '.padding()',
+                '.foregroundColor(.blue)',
+                'Button(action: {',
+                'Text("Hello, World!")',
+                '@Published var',
+                'func updateUI() {',
+                '.animation(.spring())',
+                '.onAppear {',
+                'ForEach(items) { item in',
+                '.navigationTitle("App")',
+                '.sheet(isPresented:',
+                '@Environment(\\.dismiss)',
+                '.task {',
+                'async let result =',
+                'try await',
+                '.overlay('
+            ];
+            
+            // Clear any existing interval first
+            if (codeRainInterval) {
+                clearInterval(codeRainInterval);
+            }
+            
+            codeRainInterval = setInterval(() => {
+                if (codeRain.classList.contains('active')) {
+                    // Generate 2-3 lines at once for denser effect
+                    const numLines = 3;
+                    
+                    for (let i = 0; i < numLines; i++) {
+                        setTimeout(() => {
+                            const line = document.createElement('div');
+                            line.className = 'code-line';
+                            line.textContent = codeSnippets[Math.floor(Math.random() * codeSnippets.length)];
+                            line.style.left = Math.random() * 100 + '%';
+                            line.style.animationDelay = Math.random() * 3 + 's';
+                            line.style.animationDuration = (8 + Math.random() * 4) + 's';
+                            codeRain.appendChild(line);
+                            
+                            // Clean up old lines
+                            setTimeout(() => line.remove(), 15000);
+                        }, i * 100); // Stagger the lines slightly
+                    }
+                }
+            }, 300); // More frequent generation
+        }
+        
+        // Quick Start
+        function quickStart(description) {
+            document.getElementById('messageInput').value = description;
+            sendMessage();
+        }
+        
+        // Start New App
+        function startNewApp() {
+            // Clear current project context
+            currentProjectId = null;
+            messageHistory = [];
+            
+            // Resume code rain for new app
+            resumeCodeRain();
+            
+            // Hide project indicator and new app button
+            document.getElementById('projectIndicator').classList.add('hidden');
+            document.getElementById('newAppBtn').classList.add('hidden');
+            
+            // Clear messages and show welcome screen
+            const messagesEl = document.getElementById('messages');
+            messagesEl.innerHTML = `
+                <!-- Welcome Screen -->
+                <div class="text-center py-20">
+                    <div class="mb-8">
+                        <div class="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center neon-glow mb-6">
+                            <i class="fab fa-swift text-white text-5xl"></i>
+                        </div>
+                        <h2 class="text-4xl font-bold text-white mb-3">
+                            Build iOS Apps with AI
+                        </h2>
+                        <p class="text-lg text-white/60 max-w-md mx-auto">
+                            Describe your app idea and watch it come to life instantly
+                        </p>
+                    </div>
+                    
+                    <!-- Quick Start Templates -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto">
+                        <button onclick="quickStart('Simple timer app')" class="glass rounded-xl p-4 hover:bg-white/5 transition group">
+                            <i class="fas fa-stopwatch text-2xl text-blue-400 mb-2 group-hover:scale-110 transition"></i>
+                            <p class="text-sm text-white/80">Timer App</p>
+                        </button>
+                        <button onclick="quickStart('Simple todo list app')" class="glass rounded-xl p-4 hover:bg-white/5 transition group">
+                            <i class="fas fa-tasks text-2xl text-green-400 mb-2 group-hover:scale-110 transition"></i>
+                            <p class="text-sm text-white/80">Todo List</p>
+                        </button>
+                        <button onclick="quickStart('Simple weather app')" class="glass rounded-xl p-4 hover:bg-white/5 transition group">
+                            <i class="fas fa-cloud-sun text-2xl text-yellow-400 mb-2 group-hover:scale-110 transition"></i>
+                            <p class="text-sm text-white/80">Weather</p>
+                        </button>
+                        <button onclick="quickStart('Simple calculator app')" class="glass rounded-xl p-4 hover:bg-white/5 transition group">
+                            <i class="fas fa-calculator text-2xl text-purple-400 mb-2 group-hover:scale-110 transition"></i>
+                            <p class="text-sm text-white/80">Calculator</p>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Close WebSocket connection
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            
+            // Focus input
+            document.getElementById('messageInput').focus();
+        }
+        
+        // Keyboard Shortcuts
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test UI Modification</title>
+</head>
+<body>
+    <h1>Test Modification from UI</h1>
+    <button onclick="testModification()">Test Modify Calculator with Sound</button>
+    <pre id="result"></pre>
+    
+    <script>
+        async function testModification() {
+            const resultEl = document.getElementById('result');
+            resultEl.textContent = 'Sending modification request...';
+            
+            try {
+                const response = await fetch('/api/modify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_id: 'vtzonvgh',
+                        description: 'Add a sound effect when buttons are pressed',
+                        app_name: 'Calculator'
+                    })
+                });
+                
+                const result = await response.json();
+                resultEl.textContent = JSON.stringify(result, null, 2);
+                
+                if (result.success) {
+                    resultEl.textContent += '\n\n✅ Modification successful! Check the simulator.';
+                } else {
+                    resultEl.textContent += '\n\n❌ Modification failed.';
+                }
+            } catch (error) {
+                resultEl.textContent = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

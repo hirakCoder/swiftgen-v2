@@ -21,11 +21,11 @@ class DirectBuildSystem:
     def __init__(self):
         self.simulator = SimulatorManager()
     
-    async def build_and_launch(self, project_path: str, project_id: str) -> Dict:
+    async def build_and_launch(self, project_path: str, project_id: str, is_modification: bool = False) -> Dict:
         """
         Build and launch app directly without Xcode project
         """
-        print(f"[DIRECT BUILD] Building {project_id}")
+        print(f"[DIRECT BUILD] Building {project_id} (modification: {is_modification})")
         
         # Handle both relative and absolute paths
         if not os.path.isabs(project_path):
@@ -65,10 +65,11 @@ class DirectBuildSystem:
         self._create_app_bundle(app_bundle, app_name, bundle_id)
         
         # Step 6: Launch in simulator with proper focus
+        # For modifications, bring to focus AFTER launch to show changes
         launch_success = await self.simulator.install_and_launch(
             app_bundle, 
             bundle_id,
-            bring_to_focus=False  # Don't steal focus - let user see progress complete
+            bring_to_focus=is_modification  # Bring to focus for modifications
         )
         
         if launch_success:
@@ -204,8 +205,19 @@ class DirectBuildSystem:
             content = content.replace('AppTimer.scheduledTimer', 'Timer.scheduledTimer')
         
         # Ensure UIKit is imported if haptic feedback is used
-        if 'hapticFeedback' in content and 'import UIKit' not in content:
+        if ('UIImpactFeedbackGenerator' in content or 'hapticFeedback' in content) and 'import UIKit' not in content:
             content = 'import UIKit\n' + content
+        
+        # Fix .foregroundStyle with mixed types - use .foregroundColor instead
+        import re
+        # Pattern: .foregroundStyle with conditional using .primary and .red
+        pattern = r'\.foregroundStyle\(([^)]*\?[^:]*\.primary[^:]*:[^)]*\.red[^)]*)\)'
+        if re.search(pattern, content):
+            content = re.sub(pattern, r'.foregroundColor(\1)', content)
+        # Also check reverse order
+        pattern = r'\.foregroundStyle\(([^)]*\?[^:]*\.red[^:]*:[^)]*\.primary[^)]*)\)'
+        if re.search(pattern, content):
+            content = re.sub(pattern, r'.foregroundColor(\1)', content)
         
         return content
     
@@ -242,11 +254,13 @@ class DirectBuildSystem:
             project_path = os.path.abspath(project_path)
         
         sources_dir = os.path.join(project_path, 'Sources')
-        swift_files = [
-            os.path.join(sources_dir, f) 
-            for f in os.listdir(sources_dir) 
-            if f.endswith('.swift')
-        ]
+        swift_files = []
+        
+        # Recursively find all Swift files in Sources and subdirectories
+        for root, dirs, files in os.walk(sources_dir):
+            for f in files:
+                if f.endswith('.swift'):
+                    swift_files.append(os.path.join(root, f))
         
         if not swift_files:
             print("[DIRECT BUILD] No Swift files found")
@@ -714,8 +728,11 @@ class SimulatorManager:
                 print(f"[SIMULATOR] Launch error: {result.stderr}")
                 return False
             
-            # Bring simulator to front again to show the relaunched app
+            # For modifications, bring simulator to front to show changes
+            # This happens AFTER the progress is complete so user sees both
+            await asyncio.sleep(1)  # Brief pause to let app fully launch
             self._bring_simulator_to_front()
+            print(f"[SIMULATOR] App relaunched with modifications - check simulator")
             
             return True
         except Exception as e:

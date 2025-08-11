@@ -70,29 +70,18 @@ class FlexibleModificationHandler:
         # Call LLM for modification
         if self.llm_service:
             try:
-                # Check if this is enhanced_claude_service with modify_ios_app method
-                if hasattr(self.llm_service, 'modify_ios_app'):
-                    # Use the modification-specific method
-                    response = await self.llm_service.modify_ios_app(
-                        app_name=app_name,
-                        description="",  # Not used in our context
-                        modification=modification_request,
-                        files=existing_files,
-                        existing_bundle_id=f"com.swiftgen.{app_name.lower()}",
-                        project_tracking_id=project_id
-                    )
+                # ALWAYS use the good prompt we built, not the modify_ios_app method
+                # The modify_ios_app method has its own weak prompt that doesn't follow instructions
+                # Use generate_ios_app with our custom prompt
+                response = await self.llm_service.generate_ios_app(prompt, app_name=app_name)
+                
+                # Parse and validate response
+                if hasattr(response, 'content'):
+                    modified_code = json.loads(response.content)
+                elif isinstance(response, dict):
                     modified_code = response
                 else:
-                    # Fallback to generic generate for other LLM services
-                    response = await self.llm_service.generate(prompt)
-                    
-                    # Parse and validate response
-                    if hasattr(response, 'content'):
-                        modified_code = json.loads(response.content)
-                    elif isinstance(response, dict):
-                        modified_code = response
-                    else:
-                        modified_code = json.loads(str(response))
+                    modified_code = json.loads(str(response))
                 
                 # Log what we got from LLM
                 print(f"[MODIFICATION] LLM returned {len(modified_code.get('files', []))} files")
