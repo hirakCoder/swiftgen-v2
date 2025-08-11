@@ -189,7 +189,9 @@ class RobustErrorRecoverySystem:
                 "fixes": [
                     "Define missing types or remove references",
                     "Ensure all custom Views are implemented",
-                    "Check file names match type names"
+                    "Check file names match type names",
+                    "Check if types are defined in subdirectories (e.g., Views/, Models/)",
+                    "Ensure build system includes all subdirectories in Sources/"
                 ]
             },
             "protocol_conformance": {

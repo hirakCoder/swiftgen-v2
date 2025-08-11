@@ -312,6 +312,19 @@ class DirectBuildSystem:
             else:
                 print(f"[DIRECT BUILD] Compilation failed, attempting auto-fix...")
                 
+                # First check for subdirectory issues
+                try:
+                    from core.subdirectory_error_handler import SubdirectoryErrorHandler
+                    subdirectory_check = SubdirectoryErrorHandler.suggest_fix(result.stderr, project_path)
+                    
+                    if subdirectory_check.get('has_issue') and subdirectory_check.get('action') == 'rebuild_with_subdirectories':
+                        print(f"[DIRECT BUILD] {subdirectory_check['message']}")
+                        print("[DIRECT BUILD] Note: Build system has been updated to include subdirectories")
+                        # The build system already includes subdirectories after our fix,
+                        # but this helps diagnose if the issue recurs
+                except Exception as e:
+                    print(f"[DIRECT BUILD] Subdirectory check failed: {e}")
+                
                 # Use intelligent error recovery (pattern + LLM)
                 try:
                     from core.intelligent_error_recovery import intelligent_recovery
