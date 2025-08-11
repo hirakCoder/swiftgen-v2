@@ -297,9 +297,22 @@ async def modify_app(request: GenerateRequest):
         })
         
         # Route modification - use enhanced_service directly if available for better modification handling
-        llm_service = llm_router
-        if hasattr(llm_router, 'enhanced_service'):
-            llm_service = llm_router.enhanced_service
+        # Respect user's provider preference
+        if request.provider and request.provider != "hybrid":
+            # Create a temporary router with specific provider preference
+            from generation.llm_router import LLMRouter
+            temp_router = LLMRouter()
+            temp_router.preferred_provider = request.provider
+            llm_service = temp_router
+            if hasattr(temp_router, 'enhanced_service'):
+                llm_service = temp_router.enhanced_service
+            print(f"[MODIFY] Using specific provider: {request.provider}")
+        else:
+            # Use default hybrid routing
+            llm_service = llm_router
+            if hasattr(llm_router, 'enhanced_service'):
+                llm_service = llm_router.enhanced_service
+            print("[MODIFY] Using hybrid LLM routing")
             
         result = await IntelligentModificationRouter.route_modification(
             request=request.description,
