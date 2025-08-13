@@ -129,7 +129,7 @@ class FlexibleModificationHandler:
             }
     
     def _read_project_files(self, project_path: str) -> List[Dict]:
-        """Read existing project files"""
+        """Read ALL existing project files including subdirectories"""
         files = []
         sources_dir = os.path.join(project_path, 'Sources')
         
@@ -137,13 +137,19 @@ class FlexibleModificationHandler:
             # Try root directory
             sources_dir = project_path
         
-        for filename in os.listdir(sources_dir):
-            if filename.endswith('.swift'):
-                filepath = os.path.join(sources_dir, filename)
-                with open(filepath, 'r') as f:
-                    content = f.read()
-                files.append({
-                    'path': f"Sources/{filename}",
+        # Recursively read all Swift files in Sources and subdirectories
+        for root, dirs, filenames in os.walk(sources_dir):
+            for filename in filenames:
+                if filename.endswith('.swift'):
+                    filepath = os.path.join(root, filename)
+                    with open(filepath, 'r') as f:
+                        content = f.read()
+                    
+                    # Calculate relative path from Sources directory
+                    rel_path = os.path.relpath(filepath, project_path)
+                    
+                    files.append({
+                        'path': rel_path,
                     'content': content,
                     'filename': filename
                 })
@@ -166,10 +172,21 @@ class FlexibleModificationHandler:
     def _combine_code(self, files: List[Dict]) -> str:
         """Combine code files for context"""
         combined = ""
+        total_chars = 0
         for file in files:
             combined += f"\n// File: {file['path']}\n"
             combined += file['content']
             combined += "\n\n"
+            total_chars += len(file['content'])
+        
+        print(f"[MODIFICATION] Combined {len(files)} files with {total_chars} total characters")
+        print(f"[MODIFICATION] Sending {len(combined)} characters to LLM (should be complete code)")
+        
+        # Debug: Show first file to ensure it's complete
+        if files:
+            first_file = files[0]
+            print(f"[MODIFICATION] First file {first_file['path']} has {len(first_file['content'])} chars")
+            
         return combined
     
     def _save_modified_files(self, project_path: str, files: List[Dict]):

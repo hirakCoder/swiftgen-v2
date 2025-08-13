@@ -19,6 +19,19 @@ from typing import Dict, List, Optional
 from datetime import datetime
 from pathlib import Path
 
+# Load environment variables first
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # Load from .env file
+    # Also try loading from parent directories
+    load_dotenv(dotenv_path="../.env")
+    load_dotenv(dotenv_path="../../.env")
+    print(f"Environment loading: CLAUDE_API_KEY={'✓' if os.getenv('CLAUDE_API_KEY') else '✗'}")
+    print(f"Environment loading: OPENAI_API_KEY={'✓' if os.getenv('OPENAI_API_KEY') else '✗'}")
+    print(f"Environment loading: XAI_API_KEY={'✓' if os.getenv('XAI_API_KEY') else '✗'}")
+except ImportError:
+    print("Warning: python-dotenv not installed, using system environment only")
+
 # Add swiftgen_v2 to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Add backend path for existing services
@@ -49,10 +62,16 @@ app.add_middleware(
 
 # Request/Response models
 class GenerateRequest(BaseModel):
-    description: str
+    description: Optional[str] = None
     app_name: str
     provider: Optional[str] = None  # claude, gpt4, grok, or hybrid
     project_id: Optional[str] = None  # For modifications or WebSocket sync
+    modifications: Optional[str] = None  # Alias for description in modifications
+    
+    @property
+    def request_text(self) -> str:
+        """Get the actual request text from either field"""
+        return self.modifications or self.description or ""
 
 class GenerateResponse(BaseModel):
     success: bool
@@ -314,8 +333,11 @@ async def modify_app(request: GenerateRequest):
                 llm_service = llm_router.enhanced_service
             print("[MODIFY] Using hybrid LLM routing")
             
+        # Use the unified request text property
+        modification_text = request.request_text
+        
         result = await IntelligentModificationRouter.route_modification(
-            request=request.description,
+            request=modification_text,
             project_path=project_path,
             llm_service=llm_service
         )
@@ -372,7 +394,7 @@ async def modify_app(request: GenerateRequest):
                 modification_summary += f"**What was changed:**\n"
                 
                 # Analyze the request to provide specific details
-                request_lower = request.description.lower()
+                request_lower = modification_text.lower()
                 
                 # Detect specific modifications and provide intelligent descriptions
                 if 'dark mode' in request_lower or 'theme' in request_lower:
@@ -398,7 +420,7 @@ async def modify_app(request: GenerateRequest):
                     modification_summary += f"• Improved functionality and user experience\n"
                 else:
                     # Generic fallback but still informative
-                    modification_summary += f"• {request.description}\n"
+                    modification_summary += f"• {modification_text}\n"
                     modification_summary += f"• Updated {result.get('files_modified', 0)} source files\n"
                 
                 # Add technical details if available
@@ -489,9 +511,21 @@ async def generate_app(request: GenerateRequest):
             'status': 'started'
         })
         
+        # Configure LLM provider preference if specified
+        if request.provider and request.provider != "hybrid":
+            # Use specific provider
+            if hasattr(llm_router, 'preferred_provider'):
+                llm_router.preferred_provider = request.provider
+            print(f"[API] Using specific provider: {request.provider}")
+        else:
+            # Use hybrid routing (default)
+            if hasattr(llm_router, 'preferred_provider'):
+                llm_router.preferred_provider = None
+            print("[API] Using hybrid LLM routing")
+        
         # Process through pipeline
         result = await pipeline.process_request(
-            description=request.description,
+            description=request.request_text,
             app_name=request.app_name,
             project_id=project_id
         )

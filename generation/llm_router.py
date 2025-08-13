@@ -36,19 +36,19 @@ class LLMRouter:
         self.providers = {
             LLMProvider.CLAUDE: {
                 'api_key_env': 'CLAUDE_API_KEY',
-                'timeout': 15,
+                'timeout': 45,  # Increased timeout for better reliability
                 'priority': 1,  # Best for SwiftUI
                 'strengths': ['ui', 'swiftui', 'architecture']
             },
             LLMProvider.GPT4: {
                 'api_key_env': 'OPENAI_API_KEY',
-                'timeout': 15,
+                'timeout': 45,  # Increased timeout for better reliability
                 'priority': 2,  # Good for algorithms
                 'strengths': ['logic', 'algorithms', 'data']
             },
             LLMProvider.GROK: {
                 'api_key_env': 'XAI_API_KEY',
-                'timeout': 10,
+                'timeout': 30,  # Increased from 10s
                 'priority': 3,  # Fastest, good for simple
                 'strengths': ['simple', 'fast', 'basic']
             }
@@ -59,6 +59,9 @@ class LLMRouter:
             provider: {'failures': 0, 'last_success': None}
             for provider in LLMProvider
         }
+        
+        # User preference for specific provider (None = hybrid routing)
+        self.preferred_provider = None
         
         # Initialize actual LLM clients if available
         self._init_clients()
@@ -123,6 +126,18 @@ class LLMRouter:
             preferred_provider: Prefer specific provider
             task_type: Type of task (ui, logic, simple)
         """
+        # Use instance-level preference if set (from API request)
+        if self.preferred_provider:
+            # Map string provider names to enum
+            provider_map = {
+                'claude': LLMProvider.CLAUDE,
+                'gpt4': LLMProvider.GPT4,
+                'grok': LLMProvider.GROK
+            }
+            if self.preferred_provider in provider_map:
+                preferred_provider = provider_map[self.preferred_provider]
+                print(f"[LLM Router] Using user-specified provider: {preferred_provider.value}")
+        
         # Determine provider order
         providers = self._get_provider_order(preferred_provider, task_type)
         
@@ -212,11 +227,14 @@ class LLMRouter:
                 except:
                     pass
             
+            # Determine if this is a simple app
+            is_simple = self._is_simple_app(prompt)
+            
             # Use the enhanced service's multi-LLM generation
             result = await self.enhanced_service.generate_ios_app_multi_llm(
                 description=prompt,
                 app_name=app_name,
-                is_simple_app=True  # Always treat as simple to avoid complexity
+                is_simple_app=is_simple  # Use proper detection instead of forcing simple
             )
             
             if result and 'files' in result:
@@ -252,7 +270,7 @@ class LLMRouter:
         preferred: Optional[LLMProvider],
         task_type: Optional[str]
     ) -> List[LLMProvider]:
-        """Determine optimal provider order"""
+        """Determine optimal provider order with intelligent error-aware routing"""
         # Start with all available providers
         providers = list(LLMProvider)
         
@@ -262,21 +280,58 @@ class LLMRouter:
             if self.provider_health[p]['failures'] < 5
         ]
         
-        # Sort by task type if specified
+        # Intelligent routing based on task type
         if task_type:
-            healthy_providers.sort(
-                key=lambda p: (
-                    0 if task_type in self.providers[p]['strengths'] else 1,
-                    self.providers[p]['priority']
+            # Check for error-specific routing
+            if 'error' in task_type.lower() or 'fix' in task_type.lower() or 'compilation' in task_type.lower():
+                # For iOS/Swift compilation errors, prefer Claude or GPT-4
+                error_providers = [LLMProvider.CLAUDE, LLMProvider.GPT4]
+                healthy_providers = [p for p in error_providers if p in healthy_providers]
+                # Add Grok as last resort
+                if LLMProvider.GROK in providers and LLMProvider.GROK not in healthy_providers:
+                    healthy_providers.append(LLMProvider.GROK)
+                    
+            elif 'ios' in task_type.lower() or 'swift' in task_type.lower() or 'swiftui' in task_type.lower():
+                # For iOS/Swift specific tasks, prefer Claude
+                healthy_providers.sort(
+                    key=lambda p: (
+                        0 if p == LLMProvider.CLAUDE else 
+                        1 if p == LLMProvider.GPT4 else 2
+                    )
                 )
-            )
+                
+            elif 'algorithm' in task_type.lower() or 'logic' in task_type.lower() or 'data' in task_type.lower():
+                # For algorithmic tasks, prefer GPT-4
+                healthy_providers.sort(
+                    key=lambda p: (
+                        0 if p == LLMProvider.GPT4 else 
+                        1 if p == LLMProvider.CLAUDE else 2
+                    )
+                )
+                
+            elif 'simple' in task_type.lower() or 'basic' in task_type.lower():
+                # For simple tasks, any provider is fine, prefer fastest (Grok)
+                healthy_providers.sort(
+                    key=lambda p: (
+                        0 if p == LLMProvider.GROK else 
+                        1 if p == LLMProvider.CLAUDE else 2
+                    )
+                )
+            else:
+                # Default sorting by task strengths
+                healthy_providers.sort(
+                    key=lambda p: (
+                        0 if task_type in self.providers[p]['strengths'] else 1,
+                        self.providers[p]['priority']
+                    )
+                )
         else:
             # Sort by general priority
             healthy_providers.sort(
                 key=lambda p: self.providers[p]['priority']
             )
         
-        # Put preferred provider first if specified
+        # Put preferred provider first if specified (overrides intelligent routing)
         if preferred and preferred in healthy_providers:
             healthy_providers.remove(preferred)
             healthy_providers.insert(0, preferred)
@@ -291,6 +346,43 @@ class LLMRouter:
     def _record_failure(self, provider: LLMProvider):
         """Record failed call"""
         self.provider_health[provider]['failures'] += 1
+    
+    def _is_simple_app(self, prompt: str) -> bool:
+        """Detect if this is a simple app request"""
+        # DISABLED: Every app should get full creative treatment
+        # No more templates or "simple" categorization
+        return False  # ALWAYS return False to ensure creativity
+        
+        # OLD CODE (keeping for reference but NEVER USED):
+        prompt_lower = prompt.lower()
+        simple_keywords = [
+            'simple', 'basic', 'minimal', 'quick',
+            'timer', 'counter', 'calculator', 'converter',
+            'todo', 'notes', 'flashlight'
+        ]
+        
+        # Complex app indicators
+        complex_keywords = [
+            'complex', 'advanced', 'professional', 'enterprise',
+            'authentication', 'database', 'api', 'network',
+            'social', 'e-commerce', 'real-time', 'chat',
+            'world class', 'fancy', 'beautiful ui'
+        ]
+        
+        # Count indicators
+        simple_count = sum(1 for keyword in simple_keywords if keyword in prompt_lower)
+        complex_count = sum(1 for keyword in complex_keywords if keyword in prompt_lower)
+        
+        # If explicitly complex or has more complex indicators, use full prompts
+        if complex_count > 0 or 'world class' in prompt_lower:
+            return False
+        
+        # If explicitly simple or is a basic utility
+        if simple_count > 0:
+            return True
+        
+        # Default to full prompts for better quality
+        return False
     
     def _get_mock_response(self, prompt: str) -> str:
         """Get mock response for testing"""

@@ -116,8 +116,21 @@ class IntelligentErrorRecovery:
         prompt = self._build_llm_fix_prompt(errors, file_contents)
         
         try:
-            # Call LLM for fix
-            response = await self.llm_service.generate(prompt)
+            # Call LLM for fix with intelligent routing for error/compilation tasks
+            if hasattr(self.llm_service, 'generate'):
+                # Check if the service supports task_type parameter
+                import inspect
+                sig = inspect.signature(self.llm_service.generate)
+                if 'task_type' in sig.parameters:
+                    # Use intelligent routing for compilation errors
+                    response = await self.llm_service.generate(
+                        prompt,
+                        task_type='compilation_error'  # This will route to Claude/GPT-4
+                    )
+                else:
+                    response = await self.llm_service.generate(prompt)
+            else:
+                response = await self.llm_service.generate(prompt)
             
             # Parse and apply fix
             fix_data = self._parse_llm_response(response)

@@ -164,13 +164,37 @@ class DirectBuildSystem:
     
     def _improve_code_quality(self, project_path: str):
         """
-        Fix common code quality issues in generated Swift files
-        Makes apps actually functional and good-looking
+        Fix ONLY critical syntax issues that would prevent compilation
+        Don't change working code
         """
         sources_dir = os.path.join(project_path, 'Sources')
         if not os.path.exists(sources_dir):
             return
         
+        # CRITICAL: Run syntax validator FIRST to catch common LLM errors
+        # This works regardless of which LLM provider generated the code
+        try:
+            from core.basic_syntax_validator import validate_and_fix_swift
+            
+            for filename in os.listdir(sources_dir):
+                if not filename.endswith('.swift'):
+                    continue
+                
+                filepath = os.path.join(sources_dir, filename)
+                with open(filepath, 'r') as f:
+                    content = f.read()
+                
+                # Run syntax validator to fix common issues like missing parentheses
+                fixed_content, issues = validate_and_fix_swift(content)
+                
+                if fixed_content != content:
+                    with open(filepath, 'w') as f:
+                        f.write(fixed_content)
+                    print(f"[DIRECT BUILD] Syntax validator fixed {len(issues)} issues in {filename}")
+        except Exception as e:
+            print(f"[DIRECT BUILD] Warning: Syntax validator not available: {e}")
+        
+        # Then run our other critical fixes
         for filename in os.listdir(sources_dir):
             if not filename.endswith('.swift'):
                 continue
@@ -181,43 +205,26 @@ class DirectBuildSystem:
             
             original = content
             
-            # Fix common Swift issues
-            content = self._fix_swift_syntax(content)
-            
-            # Improve UI quality
-            if 'ContentView' in filename:
-                content = self._improve_ui_quality(content)
+            # Only fix critical syntax issues
+            content = self._fix_critical_swift_syntax(content)
             
             if content != original:
                 with open(filepath, 'w') as f:
                     f.write(content)
-                print(f"[DIRECT BUILD] Improved code quality in {filename}")
+                print(f"[DIRECT BUILD] Fixed critical syntax in {filename}")
     
-    def _fix_swift_syntax(self, content: str) -> str:
-        """Fix Swift syntax issues while preserving features"""
-        # Fix environment syntax
-        content = content.replace('@Environment(\\ .dismiss)', '@Environment(\\.dismiss)')
+    def _fix_critical_swift_syntax(self, content: str) -> str:
+        """Fix ONLY critical syntax issues that prevent compilation"""
+        # Fix environment syntax (critical - causes compilation error)
+        if '@Environment(\\ .dismiss)' in content:
+            content = content.replace('@Environment(\\ .dismiss)', '@Environment(\\.dismiss)')
         
-        # Only fix Timer if it's using incorrect syntax
-        if 'struct AppTimer' in content:
-            content = re.sub(r'struct AppTimer \{[^}]*\}[^}]*\}', '', content, flags=re.DOTALL)
+        # Fix broken Timer struct (critical - causes compilation error)
+        if 'struct AppTimer {' in content and 'struct AppTimer: Timer' in content:
+            # This is a broken definition that would fail compilation
+            content = re.sub(r'struct AppTimer\s*:\s*Timer\s*\{[^}]*\}', '', content, flags=re.DOTALL)
             content = content.replace('AppTimer?', 'Timer?')
             content = content.replace('AppTimer.scheduledTimer', 'Timer.scheduledTimer')
-        
-        # Ensure UIKit is imported if haptic feedback is used
-        if ('UIImpactFeedbackGenerator' in content or 'hapticFeedback' in content) and 'import UIKit' not in content:
-            content = 'import UIKit\n' + content
-        
-        # Fix .foregroundStyle with mixed types - use .foregroundColor instead
-        import re
-        # Pattern: .foregroundStyle with conditional using .primary and .red
-        pattern = r'\.foregroundStyle\(([^)]*\?[^:]*\.primary[^:]*:[^)]*\.red[^)]*)\)'
-        if re.search(pattern, content):
-            content = re.sub(pattern, r'.foregroundColor(\1)', content)
-        # Also check reverse order
-        pattern = r'\.foregroundStyle\(([^)]*\?[^:]*\.red[^:]*:[^)]*\.primary[^)]*)\)'
-        if re.search(pattern, content):
-            content = re.sub(pattern, r'.foregroundColor(\1)', content)
         
         return content
     
@@ -247,7 +254,7 @@ class DirectBuildSystem:
         return content
     
     async def _compile_swift(self, project_path: str, app_bundle: str, app_name: str) -> bool:
-        """Compile Swift files using swiftc"""
+        """Compile Swift files using swiftc with iOS 16 compatibility validation"""
         # Handle both relative and absolute paths
         if not os.path.isabs(project_path):
             # If relative, make it absolute from current working directory
@@ -256,7 +263,7 @@ class DirectBuildSystem:
         sources_dir = os.path.join(project_path, 'Sources')
         swift_files = []
         
-        # Recursively find all Swift files in Sources and subdirectories
+        # Just collect Swift files first, no proactive iOS 16 fixes
         for root, dirs, files in os.walk(sources_dir):
             for f in files:
                 if f.endswith('.swift'):
@@ -312,6 +319,61 @@ class DirectBuildSystem:
             else:
                 print(f"[DIRECT BUILD] Compilation failed, attempting auto-fix...")
                 
+                # Send WebSocket update about fixing
+                async def send_fix_status(message):
+                    try:
+                        if hasattr(self, 'websocket_callback') and self.websocket_callback:
+                            await self.websocket_callback({
+                                'type': 'status',
+                                'message': message,
+                                'stage': 'fix'
+                            })
+                    except:
+                        pass
+                
+                await send_fix_status('🔧 Analyzing compilation errors...')
+                
+                # Check for iOS version errors and fix ONLY if present
+                if 'is only available in iOS' in result.stderr:
+                    try:
+                        from core.ios16_compatibility_validator import ios16_validator
+                        
+                        print("[DIRECT BUILD] iOS version compatibility issues detected, applying fixes...")
+                        
+                        # Only fix files with iOS version errors
+                        files_with_errors = self._extract_files_from_errors(result.stderr)
+                        ios_fixes_applied = 0
+                        
+                        for file_path in files_with_errors:
+                            if os.path.exists(file_path):
+                                with open(file_path, 'r') as f:
+                                    content = f.read()
+                                
+                                fixed_content, fixes = ios16_validator.fix_compatibility_issues(content)
+                                
+                                if fixes:
+                                    with open(file_path, 'w') as f:
+                                        f.write(fixed_content)
+                                    ios_fixes_applied += len(fixes)
+                                    print(f"[iOS 16 Validator] Applied {len(fixes)} fixes to {os.path.basename(file_path)}")
+                        
+                        if ios_fixes_applied > 0:
+                            # Retry compilation after iOS fixes
+                            result = subprocess.run(
+                                compile_cmd,
+                                capture_output=True,
+                                text=True,
+                                timeout=30,
+                                cwd=project_path
+                            )
+                            
+                            if result.returncode == 0:
+                                print("[DIRECT BUILD] Successfully compiled after iOS 16 fixes!")
+                                os.chmod(os.path.join(app_bundle, app_name), 0o755)
+                                return True
+                    except Exception as e:
+                        print(f"[iOS 16 Validator] Error: {e}")
+                
                 # First check learning system for known fixes
                 try:
                     from core.learning_error_recovery import learning_recovery
@@ -366,7 +428,114 @@ class DirectBuildSystem:
                 except Exception as e:
                     print(f"[DIRECT BUILD] Subdirectory check failed: {e}")
                 
-                # Use intelligent error recovery (pattern + LLM)
+                # First try advanced Swift fixer for complex issues ONLY if there are relevant errors
+                if ('cannot find' in result.stderr and 'in scope' in result.stderr) or \
+                   ('swipeActions' in result.stderr) or \
+                   ('sheet' in result.stderr and 'Binding' in result.stderr) or \
+                   ('async' in result.stderr or 'await' in result.stderr):
+                    try:
+                        from core.advanced_swift_fixer import fix_complex_swift_issues
+                        
+                        print("[DIRECT BUILD] Detected complex Swift pattern errors, applying advanced fixes...")
+                        
+                        # Only fix files mentioned in the error output
+                        files_with_errors = self._extract_files_from_errors(result.stderr)
+                        complex_fixes_applied = []
+                        
+                        for file_path in files_with_errors:
+                            if os.path.exists(file_path) and file_path.endswith('.swift'):
+                                with open(file_path, 'r') as f:
+                                    content = f.read()
+                                
+                                fixed_content, fixes = fix_complex_swift_issues(content, result.stderr)
+                                
+                                if fixes:
+                                    with open(file_path, 'w') as f:
+                                        f.write(fixed_content)
+                                    complex_fixes_applied.extend(fixes)
+                        
+                        if complex_fixes_applied:
+                            print(f"[DIRECT BUILD] Advanced fixer applied {len(complex_fixes_applied)} complex fixes:")
+                            for fix in complex_fixes_applied:
+                                print(f"  🔧 {fix}")
+                            
+                            # Retry compilation
+                            result = subprocess.run(
+                                compile_cmd,
+                                capture_output=True,
+                                text=True,
+                                timeout=30,
+                                cwd=project_path
+                            )
+                            
+                            if result.returncode == 0:
+                                print("[DIRECT BUILD] Successfully compiled after complex fixes!")
+                                return True
+                    
+                    except Exception as e:
+                        print(f"[DIRECT BUILD] Advanced fixer error: {e}")
+                
+                # Fix MainActor isolation issues FIRST
+                if "actor context" in result.stderr or "MainActor" in result.stderr:
+                    try:
+                        from core.mainactor_fixer import fix_mainactor_issues
+                        
+                        await send_fix_status('🎭 Fixing actor isolation issues...')
+                        print("[DIRECT BUILD] Fixing MainActor isolation issues...")
+                        actor_result = fix_mainactor_issues(result.stderr, project_path)
+                        
+                        if actor_result["success"]:
+                            print(f"[DIRECT BUILD] Fixed actor issues: {actor_result['fixes_applied']}")
+                            await send_fix_status(f"✅ Fixed {len(actor_result['fixes_applied'])} actor issues")
+                    except Exception as e:
+                        print(f"[DIRECT BUILD] MainActor fixer error: {e}")
+                
+                # Fix missing parenthesis issues
+                if "expected ')'" in result.stderr:
+                    try:
+                        from core.mainactor_fixer import fix_missing_parenthesis
+                        
+                        await send_fix_status('🔧 Fixing missing parentheses...')
+                        paren_result = fix_missing_parenthesis(result.stderr, project_path)
+                        
+                        if paren_result["success"]:
+                            print(f"[DIRECT BUILD] Fixed parenthesis: {paren_result['fixes_applied']}")
+                            await send_fix_status(f"✅ Fixed {len(paren_result['fixes_applied'])} syntax issues")
+                    except Exception as e:
+                        print(f"[DIRECT BUILD] Parenthesis fixer error: {e}")
+                
+                # Then try standard Swift compilation fixer
+                try:
+                    from core.swift_compilation_fixer import auto_fix_swift_errors
+                    
+                    await send_fix_status('🔨 Applying Swift syntax fixes...')
+                    print("[DIRECT BUILD] Applying standard Swift compilation fixes...")
+                    swift_fix_result = auto_fix_swift_errors(result.stderr, project_path)
+                    
+                    if swift_fix_result["success"]:
+                        print(f"[DIRECT BUILD] Swift fixer applied {len(swift_fix_result['fixes_applied'])} fixes")
+                        fixes_summary = f"✅ Applied {len(swift_fix_result['fixes_applied'])} automatic fixes"
+                        await send_fix_status(fixes_summary)
+                        
+                        for fix in swift_fix_result['fixes_applied']:
+                            print(f"  ✅ {fix}")
+                        
+                        # Retry compilation after Swift fixes
+                        result = subprocess.run(
+                            compile_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                            cwd=project_path
+                        )
+                        
+                        if result.returncode == 0:
+                            print("[DIRECT BUILD] Successfully compiled after Swift fixes!")
+                            return True
+                except Exception as e:
+                    print(f"[DIRECT BUILD] Swift fixer error: {e}")
+                
+                # If Swift fixer didn't work, use intelligent error recovery (pattern + LLM)
                 try:
                     from core.intelligent_error_recovery import intelligent_recovery
                     
@@ -455,6 +624,24 @@ class DirectBuildSystem:
         except Exception as e:
             print(f"[DIRECT BUILD] Compilation error: {e}")
             return False
+    
+    def _extract_files_from_errors(self, error_output: str) -> List[str]:
+        """Extract file paths mentioned in error output"""
+        files = set()
+        lines = error_output.split('\n')
+        
+        for line in lines:
+            # Match file paths in error messages
+            # Pattern: /path/to/file.swift:line:column: error:
+            match = re.match(r'(/[^:]+\.swift):\d+:\d+:', line)
+            if match:
+                files.add(match.group(1))
+            # Also match relative paths
+            match = re.match(r'([^/][^:]+\.swift):\d+:\d+:', line)
+            if match:
+                files.add(match.group(1))
+        
+        return list(files)
     
     def _fix_compilation_errors(self, project_path: str, errors: str):
         """Fix specific compilation errors"""

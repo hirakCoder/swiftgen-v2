@@ -259,6 +259,15 @@ Return a JSON response with this EXACT structure:
             logger.info(f"[ENHANCED_CLAUDE] Calling LLM for generation...")
             result = await self._generate_with_current_model(system_prompt, user_prompt)
             logger.info(f"[ENHANCED_CLAUDE] Got LLM response, type: {type(result)}, length: {len(str(result))}")
+            
+            # DEBUG: Log the first 500 chars of raw response to check for JSON issues
+            if isinstance(result, str):
+                logger.debug(f"[RAW RESPONSE] First 500 chars: {result[:500]}")
+                # Check for common JSON issues
+                if '\\"' in result[:500]:
+                    logger.warning("[JSON WARNING] Response contains escaped quotes that may cause parsing issues")
+                if '\\n' in result[:500] and not '\\\\n' in result[:500]:
+                    logger.warning("[JSON WARNING] Response contains unescaped newlines")
 
             # Parse JSON response
             if isinstance(result, str):
@@ -268,7 +277,61 @@ Return a JSON response with this EXACT structure:
                     result = result[7:]
                 if result.endswith("```"):
                     result = result[:-3]
-                result = json.loads(result)
+                
+                # CRITICAL: Fix common JSON issues BEFORE parsing
+                original_result = result
+                try:
+                    result = json.loads(result)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"[JSON FIX] Initial parse failed at pos {e.pos}: {e.msg}")
+                    
+                    # Try to fix common JSON escaping issues from LLMs
+                    fixed_json = result
+                    
+                    # Fix unescaped newlines and tabs in JSON strings
+                    import re
+                    # This pattern finds string values and fixes escape sequences
+                    def fix_string_escapes(text):
+                        # Find all string values in JSON
+                        in_string = False
+                        fixed = []
+                        i = 0
+                        while i < len(text):
+                            if text[i] == '"' and (i == 0 or text[i-1] != '\\'):
+                                in_string = not in_string
+                                fixed.append(text[i])
+                            elif in_string:
+                                if text[i] == '\n':
+                                    fixed.append('\\n')
+                                elif text[i] == '\r':
+                                    fixed.append('\\r')
+                                elif text[i] == '\t':
+                                    fixed.append('\\t')
+                                elif text[i] == '\\' and i + 1 < len(text) and text[i+1] not in 'nrt"\\':
+                                    # Escape lone backslashes
+                                    fixed.append('\\\\')
+                                else:
+                                    fixed.append(text[i])
+                            else:
+                                fixed.append(text[i])
+                            i += 1
+                        return ''.join(fixed)
+                    
+                    try:
+                        fixed_json = fix_string_escapes(fixed_json)
+                        result = json.loads(fixed_json)
+                        logger.info("[JSON FIX] Successfully fixed escape sequences and parsed JSON")
+                    except json.JSONDecodeError as e2:
+                        logger.error(f"[JSON FIX] Still failed: {e2}")
+                        # Last resort: try to extract valid JSON
+                        json_match = re.search(r'\{[\s\S]*\}', original_result)
+                        if json_match:
+                            try:
+                                result = json.loads(json_match.group(0))
+                            except:
+                                raise e  # Re-raise original error
+                        else:
+                            raise e
             
             # Check for truncated code
             if "files" in result:

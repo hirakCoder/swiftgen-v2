@@ -93,9 +93,13 @@ class IntelligentLLMRouter:
         logger.info(f"Modification history present: {modification_history is not None}")
         logger.info(f"Is modification context: {is_modification_context}")
         
+        # CRITICAL: Check for explicit modification marker FIRST
+        if "MODIFICATION REQUEST" in description and "DO NOT CREATE" in description:
+            logger.info("Explicit MODIFICATION REQUEST marker found - treating as modification")
+            is_creation = False
         # Check if this is app creation (not modification)
         # If explicitly marked as modification context, skip creation detection
-        if is_modification_context:
+        elif is_modification_context:
             logger.info("Skipping creation detection - explicit modification context")
             is_creation = False
         else:
@@ -163,10 +167,12 @@ class IntelligentLLMRouter:
         # - "Make something that tracks stocks" -> App creation
         #
         # The key insight: Creation intent + no existing project = app generation
-        is_app_creation = is_creation and not modification_history
-        logger.info(f"Is app creation: {is_app_creation} (creation request without existing project)")
+        # BUT: Never treat as app creation if we have the modification marker
+        has_modification_marker = "MODIFICATION REQUEST" in description and "DO NOT CREATE" in description
+        is_app_creation = is_creation and not modification_history and not has_modification_marker
+        logger.info(f"Is app creation: {is_app_creation} (creation={is_creation}, no history={not modification_history}, no marker={not has_modification_marker})")
         
-        if is_app_creation and not modification_history:
+        if is_app_creation:
             logger.info("Returning ARCHITECTURE for app creation")
             return RequestType.ARCHITECTURE
         

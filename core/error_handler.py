@@ -105,6 +105,14 @@ class SwiftErrorAutoFixer:
                 description="ContentUnavailableView requires iOS 17+"
             ),
             
+            # Toolbar ambiguity
+            ErrorPattern(
+                pattern=r"ambiguous use of 'toolbar\(content:\)'",
+                error_type=ErrorType.COMPILATION_ERROR,
+                fix_strategy="fix_toolbar_ambiguity",
+                description="Toolbar content ambiguity"
+            ),
+            
             # Syntax errors
             ErrorPattern(
                 pattern=r"expected '(\{|\}|\)|\])' in",
@@ -181,6 +189,8 @@ class SwiftErrorAutoFixer:
             return True
         elif error.fix_strategy == "replace_content_unavailable_view":
             content = self._replace_content_unavailable_view(content)
+        elif error.fix_strategy == "fix_toolbar_ambiguity":
+            content = self._fix_toolbar_ambiguity(content)
         
         if content != original_content:
             with open(file_path, 'w') as f:
@@ -367,10 +377,46 @@ class SwiftErrorAutoFixer:
         
         return content
     
+    def _fix_toolbar_ambiguity(self, content: str) -> str:
+        """Fix toolbar content ambiguity by specifying placement and using proper builder"""
+        import re
+        
+        # Pattern 1: toolbar with simple content - add placement
+        content = re.sub(
+            r'\.toolbar\s*\{([^}]+)\}',
+            r'.toolbar(placement: .navigationBarTrailing) {\1}',
+            content
+        )
+        
+        # Pattern 2: If toolbar has complex content, ensure it uses ToolbarItemGroup
+        content = re.sub(
+            r'\.toolbar\s*\(placement:\s*\.(\w+)\)\s*\{([^}]+Button[^}]+)\}',
+            r'''.toolbar {
+                ToolbarItemGroup(placement: .\1) {
+                    \2
+                }
+            }''',
+            content
+        )
+        
+        # Pattern 3: Fix toolbar(content:) to use modern syntax
+        content = re.sub(
+            r'\.toolbar\s*\(content:\s*\{([^}]+)\}\)',
+            r'.toolbar {\1}',
+            content
+        )
+        
+        return content
+    
     def auto_fix_compilation_errors(self, error_output: str, project_path: str) -> Dict:
-        """Main entry point for auto-fixing compilation errors"""
+        """Main entry point for auto-fixing compilation errors - handles ALL errors in multiple passes"""
         print("🔧 Auto-fixing compilation errors...")
         
+        total_fixed_count = 0
+        all_errors_fixed = []
+        sources_dir = os.path.join(project_path, "Sources")
+        
+        # Process ALL detected errors, not just the first one
         detected_errors = self.detect_errors(error_output)
         
         if not detected_errors:
@@ -380,25 +426,57 @@ class SwiftErrorAutoFixer:
                 "fixed_count": 0
             }
         
-        fixed_count = 0
-        sources_dir = os.path.join(project_path, "Sources")
+        print(f"📊 Found {len(detected_errors)} errors to fix")
         
-        # Try to fix each detected error
+        # Group errors by file to be more efficient
+        errors_by_file = {}
+        
+        # First, detect which files need which fixes
         for error_pattern, error_text in detected_errors:
             print(f"🔍 Detected: {error_pattern.description}")
             
-            # Apply fix to all Swift files
+            # For now, apply to all Swift files (can be optimized later with error line numbers)
             if os.path.exists(sources_dir):
+                # Check both Sources/ directory and subdirectories
+                swift_files = []
+                
+                # Get files from Sources/
                 for file_name in os.listdir(sources_dir):
                     if file_name.endswith('.swift'):
-                        file_path = os.path.join(sources_dir, file_name)
-                        if self.fix_file(file_path, error_pattern, error_text):
-                            fixed_count += 1
+                        swift_files.append(os.path.join(sources_dir, file_name))
+                
+                # Also check subdirectories
+                for root, dirs, files in os.walk(sources_dir):
+                    for file_name in files:
+                        if file_name.endswith('.swift'):
+                            file_path = os.path.join(root, file_name)
+                            if file_path not in swift_files:
+                                swift_files.append(file_path)
+                
+                # Apply fixes to all Swift files
+                for file_path in swift_files:
+                    if file_path not in errors_by_file:
+                        errors_by_file[file_path] = []
+                    errors_by_file[file_path].append((error_pattern, error_text))
+        
+        # Now apply all fixes for each file
+        for file_path, file_errors in errors_by_file.items():
+            print(f"📝 Fixing {len(file_errors)} errors in {os.path.basename(file_path)}")
+            
+            # Apply all fixes for this file
+            for error_pattern, error_text in file_errors:
+                if self.fix_file(file_path, error_pattern, error_text):
+                    total_fixed_count += 1
+                    all_errors_fixed.append(error_pattern.description)
+        
+        # Remove duplicates from fixed errors list
+        unique_errors_fixed = list(set(all_errors_fixed))
         
         return {
-            "success": fixed_count > 0,
-            "message": f"Fixed {fixed_count} errors",
-            "fixed_count": fixed_count,
+            "success": total_fixed_count > 0,
+            "message": f"Fixed {total_fixed_count} error occurrences across {len(unique_errors_fixed)} error types",
+            "fixed_count": total_fixed_count,
+            "error_types_fixed": unique_errors_fixed,
             "history": self.fix_history
         }
     

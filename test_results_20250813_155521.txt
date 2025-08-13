@@ -1,0 +1,8 @@
+Counter,claude,False,0
+TodoList,gpt4,False,0
+Weather,claude,False,0
+Calculator,grok,False,0
+Timer,claude,False,0
+Notes1,claude,False,0
+Notes2,claude,False,0
+Notes3,claude,False,0

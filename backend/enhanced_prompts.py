@@ -167,6 +167,115 @@ CRITICAL SYNTAX RULES - MUST FOLLOW:
     - For iOS 16 target, use the single parameter version
     - NEVER use the iOS 17+ two-parameter version for iOS 16 apps
 
+25. SWIPEACTIONS WITH NESTED FOREACH - CRITICAL PATTERN:
+    ✅ CORRECT - swipeActions on inner ForEach item:
+    ```swift
+    ForEach(categories) { category in
+        Section {
+            ForEach(items.filter { $0.category == category }) { item in
+                ItemRow(item: item)
+                    .swipeActions {  // ✅ Attached to the row, item is in scope
+                        Button(role: .destructive) {
+                            items.removeAll { $0.id == item.id }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+            }
+        }
+    }
+    ```
+    
+    ❌ WRONG - swipeActions on outer ForEach:
+    ```swift
+    ForEach(categories) { category in
+        Section {
+            ForEach(items.filter { $0.category == category }) { item in
+                ItemRow(item: item)
+            }
+        }
+        .swipeActions {  // ❌ item is not in scope here!
+            Button(role: .destructive) {
+                items.removeAll { $0.id == item.id }  // ERROR: cannot find 'item'
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+    ```
+
+26. COMPLEX VIEW HIERARCHIES - BEST PRACTICES:
+    - Extract complex views into separate structs
+    - Use ViewBuilder for conditional content
+    - Group more than 10 children in VStack/HStack
+    - Use computed properties for complex logic
+    - Avoid deeply nested closures
+
+27. ASYNC/AWAIT IN SWIFTUI:
+    - Use .task modifier for async work
+    - Wrap non-async context calls in Task { }
+    - Mark functions as async when using await
+    - Use @MainActor for UI updates
+
+28. COMPLEX PATTERN BEST PRACTICES:
+    - Always verify variable scope before using
+    - Attach modifiers to correct view level
+    - Pass data through proper channels (bindings, parameters)
+    - Extract complex views to separate structs when nesting gets deep
+    - Use @ViewBuilder for conditional complex content
+
+29. COMMON SCOPE PATTERNS TO AVOID:
+    ❌ WRONG - Variable out of scope:
+    ```swift
+    ForEach(categories) { category in
+        ForEach(items.filter { $0.category == category }) { item in
+            Text(item.name)
+        }
+    }
+    .swipeActions {
+        Button("Delete") {
+            // ERROR: 'item' is not accessible here
+            deleteItem(item)
+        }
+    }
+    ```
+    
+    ✅ CORRECT - Variable in scope:
+    ```swift
+    ForEach(categories) { category in
+        ForEach(items.filter { $0.category == category }) { item in
+            Text(item.name)
+                .swipeActions {  // Attached to the view that has 'item' in scope
+                    Button("Delete") {
+                        deleteItem(item)  // 'item' is accessible here
+                    }
+                }
+        }
+    }
+    ```
+
+30. SHEET AND NAVIGATION PATTERNS:
+    ✅ CORRECT - Proper binding:
+    ```swift
+    @State private var showingSheet = false
+    @State private var selectedItem: Item?
+    
+    .sheet(isPresented: $showingSheet) {  // Note the $ for binding
+        DetailView()
+    }
+    
+    .sheet(item: $selectedItem) { item in  // Note the $ for binding
+        DetailView(item: item)
+    }
+    ```
+    
+    ❌ WRONG - Missing binding:
+    ```swift
+    .sheet(isPresented: showingSheet) {  // Missing $
+        DetailView()
+    }
+    ```
+
 MODERN PATTERN EXAMPLES:
 // ✅ CORRECT - NavigationStack
 NavigationStack {

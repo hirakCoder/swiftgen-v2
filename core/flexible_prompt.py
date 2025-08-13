@@ -4,6 +4,9 @@ Ensures App Store readiness while maximizing creativity
 """
 
 import re
+import random
+import uuid
+from datetime import datetime
 from typing import Dict, List, Optional
 
 class FlexiblePromptBuilder:
@@ -20,6 +23,7 @@ class FlexiblePromptBuilder:
         """
         Build adaptive prompt based on user's actual request
         No rigid categories - interprets intent intelligently
+        NOW WITH VARIATION for unique outputs each time
         """
         app_name = requirements.get('app_name', 'App')
         app_type = requirements.get('app_type', '')
@@ -32,6 +36,13 @@ class FlexiblePromptBuilder:
             context = f"Create a {app_type} app" if app_type else "Create an innovative app"
             if features:
                 context += f" with {', '.join(features)}"
+        
+        # Add unique variation to each generation
+        unique_seed = str(uuid.uuid4())[:8]
+        timestamp = datetime.now().isoformat()
+        
+        # Random creative suggestions to ensure uniqueness
+        creative_suggestions = FlexiblePromptBuilder._get_random_creative_suggestions()
         
         # Core requirements that ensure App Store approval
         core_requirements = """
@@ -63,6 +74,11 @@ QUALITY GUIDELINES (Flexible):
 
 {context}
 
+UNIQUE GENERATION ID: {unique_seed}
+Be creative and make this implementation unique! 
+
+{creative_suggestions}
+
 {core_requirements}
 
 {quality_guidelines}
@@ -70,7 +86,8 @@ QUALITY GUIDELINES (Flexible):
 {context_hints}
 
 CREATIVE FREEDOM:
-• This is YOUR interpretation - be creative!
+• This is YOUR interpretation - be creative and UNIQUE!
+• Each generation should be different - explore various approaches
 • Add features that make sense for this type of app
 • Use any SwiftUI features that enhance the experience
 • Make design choices that fit the app's purpose
@@ -95,6 +112,66 @@ Return JSON with your creative implementation:
 }}
 """
         return prompt
+    
+    @staticmethod
+    def _get_random_creative_suggestions() -> str:
+        """
+        Generate random creative suggestions to ensure unique outputs
+        """
+        color_schemes = [
+            "vibrant gradient backgrounds",
+            "subtle pastel colors",
+            "bold monochrome design",
+            "dynamic color themes",
+            "elegant minimalist palette",
+            "playful rainbow accents",
+            "sophisticated dark theme",
+            "nature-inspired colors"
+        ]
+        
+        animation_styles = [
+            "smooth spring animations",
+            "playful bounce effects",
+            "subtle fade transitions",
+            "dynamic scaling effects",
+            "elegant slide animations",
+            "creative rotation effects",
+            "fluid morphing transitions",
+            "delightful micro-interactions"
+        ]
+        
+        layout_approaches = [
+            "card-based layout",
+            "full-screen immersive design",
+            "compact information density",
+            "spacious breathing room",
+            "asymmetric creative layout",
+            "grid-based organization",
+            "flowing organic shapes",
+            "geometric precision"
+        ]
+        
+        special_features = [
+            "surprise delighter animations",
+            "hidden easter eggs",
+            "contextual haptic feedback",
+            "adaptive UI based on time of day",
+            "playful sound effects",
+            "gesture-based shortcuts",
+            "pull-to-refresh with custom animation",
+            "long-press context menus"
+        ]
+        
+        # Randomly select suggestions
+        suggestions = f"""
+CREATIVE INSPIRATION (Make it unique!):
+• Try {random.choice(color_schemes)} for visual appeal
+• Consider {random.choice(animation_styles)} for interactions
+• Explore {random.choice(layout_approaches)} for structure
+• Add {random.choice(special_features)} for delight
+• Focus on {random.choice(['accessibility', 'performance', 'visual polish', 'user delight', 'intuitive flow'])}
+"""
+        return suggestions
     
     @staticmethod
     def _get_contextual_hints(app_type: str, features: List[str], description: str = None) -> str:
@@ -201,14 +278,24 @@ STRICT REQUIREMENTS:
 • Keep accessibility support
 • Ensure responsive layout on all devices
 
+CRITICAL SWIFT SYNTAX RULES TO PREVENT COMPILATION ERRORS:
+• For Codable structs with UUID: Use 'var id = UUID()' NOT 'let id = UUID()'
+• For date formatting: Use '.formatted(.relative(presentation: .numeric))' NOT '.formatted(.relative)'
+• When passing Bindings: Use '$propertyName' NOT 'propertyName'
+• Match parameter names EXACTLY: Check existing function signatures
+• For iOS 16 target: NO ContentUnavailableView, NO .symbolEffect, NO @Observable
+• Import required modules: UIKit for UI components, Foundation for Date/UUID/Timer
+• ViewModels need @ObservedObject or @StateObject, not plain properties
+• Check ALL function calls match expected parameter names and types
+
 WHAT TO CHANGE:
 • ONLY the specific feature/fix requested
 • Make minimal code changes to achieve the request
 • If the user asks to "enhance UI" or "improve UX", then and only then make broader changes
 • Default to conservative modifications unless user explicitly asks for creativity
 
-CURRENT CODE STRUCTURE:
-{existing_code[:3000]}...
+CURRENT CODE STRUCTURE (COMPLETE):
+{existing_code}
 
 IMPORTANT:
 • Return the COMPLETE modified code for all affected files

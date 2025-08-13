@@ -243,8 +243,9 @@ class SwiftGenPipeline:
     
     async def _generate_code(self, intent: AppIntent) -> Dict:
         """Generate code based on intent"""
-        # Try simple generator first for basic apps
-        if intent.app_type in ['counter', 'timer', 'todo', 'calculator']:
+        # DISABLED: Templates kill creativity - ALWAYS use LLM
+        # This was causing all apps to look the same!
+        if False:  # NEVER use templates
             from generation.simple_generator import simple_generator
             
             project_path = f"workspaces/temp_{intent.app_name.lower()}"
@@ -294,13 +295,34 @@ class SwiftGenPipeline:
             raise Exception(f"Unexpected response type: {type(result)}")
     
     async def _save_project(self, project_id: str, code: Dict) -> str:
-        """Save project files to disk"""
+        """Save project files to disk with syntax validation"""
         project_path = f"workspaces/{project_id}"
         os.makedirs(project_path, exist_ok=True)
         
         # Ensure Sources directory exists
         sources_dir = os.path.join(project_path, 'Sources')
         os.makedirs(sources_dir, exist_ok=True)
+        
+        # Validate and fix syntax before saving
+        try:
+            from core.basic_syntax_validator import validate_and_fix_swift
+            
+            syntax_fixes = []
+            for file_info in code.get('files', []):
+                if file_info['path'].endswith('.swift'):
+                    fixed_content, issues = validate_and_fix_swift(file_info['content'])
+                    if fixed_content != file_info['content']:
+                        print(f"[Pipeline] Fixed syntax issues in {file_info['path']}")
+                        file_info['content'] = fixed_content
+                        syntax_fixes.append(os.path.basename(file_info['path']))
+            
+            if syntax_fixes:
+                await self.send_status(
+                    f"✨ Auto-fixed syntax issues in: {', '.join(syntax_fixes)}", 
+                    "validate"
+                )
+        except Exception as e:
+            print(f"[Pipeline] Syntax validation error: {e}")
         
         # Save each file
         for file_info in code.get('files', []):
@@ -330,9 +352,24 @@ class SwiftGenPipeline:
             # Return mock success if no build service
             return {'success': True, 'app_path': project_path}
         
+        # Pass WebSocket callback to build service for real-time updates
+        if hasattr(self.build_service, 'websocket_callback'):
+            self.build_service.websocket_callback = self.status_callback
+        
         # Use production builder if it has the build_and_launch method
         if hasattr(self.build_service, 'build_and_launch'):
-            return await self.build_service.build_and_launch(project_path, project_id)
+            result = await self.build_service.build_and_launch(project_path, project_id)
+            
+            # Send feedback about what happened during build
+            if not result.get('success') and self.status_callback:
+                await self.status_callback({
+                    'type': 'status',
+                    'message': '❌ Build failed after multiple auto-fix attempts',
+                    'stage': 'build',
+                    'details': result.get('error', 'Unknown error')
+                })
+            
+            return result
         else:
             return await self.build_service.build(project_path, project_id)
     
