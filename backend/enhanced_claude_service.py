@@ -72,7 +72,7 @@ class EnhancedClaudeService:
                 name="Claude 3.5 Sonnet",
                 provider="anthropic",
                 api_key_env="CLAUDE_API_KEY",
-                model_id="claude-3-5-sonnet-20241022",  # Latest Claude model
+                model_id="claude-3-5-sonnet-latest",  # Use latest Claude model for better Swift syntax
                 max_tokens=8192  # Increased for complete app generation
             ),
             LLMModel(

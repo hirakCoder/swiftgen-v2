@@ -33,19 +33,19 @@ class LLMRouter:
     
     def __init__(self):
         # Provider configuration
-        # IMPORTANT: GPT-4 is now priority 1 due to Claude's Swift syntax issues
+        # Using claude-3-5-sonnet-latest which has better Swift syntax
         self.providers = {
             LLMProvider.CLAUDE: {
                 'api_key_env': 'CLAUDE_API_KEY',
                 'timeout': 45,  # Increased timeout for better reliability
-                'priority': 2,  # Demoted due to Swift syntax issues (Aug 13, 2025)
-                'strengths': ['ui', 'swiftui', 'architecture']
+                'priority': 1,  # Priority 1 with latest model
+                'strengths': ['ui', 'swiftui', 'architecture', 'swift', 'ios']
             },
             LLMProvider.GPT4: {
                 'api_key_env': 'OPENAI_API_KEY',
                 'timeout': 45,  # Increased timeout for better reliability
-                'priority': 1,  # Promoted to priority 1 - better Swift syntax
-                'strengths': ['swift', 'swiftui', 'ios', 'logic', 'algorithms', 'data']
+                'priority': 2,  # Good fallback option
+                'strengths': ['logic', 'algorithms', 'data']
             },
             LLMProvider.GROK: {
                 'api_key_env': 'XAI_API_KEY',
@@ -246,7 +246,7 @@ class LLMRouter:
         # Direct API calls (fallback)
         if provider == LLMProvider.CLAUDE:
             response = await client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-5-sonnet-latest",
                 max_tokens=8192,
                 messages=[{"role": "user", "content": prompt}]
             )
