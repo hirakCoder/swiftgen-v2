@@ -70,6 +70,9 @@ QUALITY GUIDELINES (Flexible):
             app_type, features, raw_description
         )
         
+        # DEBUG: Log that we're using the updated prompt
+        print(f"[FLEXIBLE PROMPT] Building prompt with SYNTAX REQUIREMENTS for {app_name}")
+        
         prompt = f"""Create a SwiftUI iOS app: {app_name}
 
 {context}
@@ -100,6 +103,21 @@ TECHNICAL NOTES:
 • For persistence: Use @AppStorage or UserDefaults for simple data
 • For networking: Use URLSession with async/await
 • Handle errors gracefully with user-friendly messages
+
+SYNTAX REQUIREMENTS (CRITICAL - Your code MUST compile):
+• Every opening brace {{ must have exactly ONE matching closing brace }}
+• Every opening parenthesis ( must have exactly ONE matching closing parenthesis )
+• When writing ternary operators (condition ? true : false), ensure ALL parts are present
+• For multiline expressions, double-check that parentheses are balanced
+• NEVER write incomplete expressions like "condition ?)" - always include both true and false parts
+• For @MainActor: Use it only once per class, at the class declaration level
+• For Timer: Use Timer.publish(every:, on:, in:) with .onReceive modifier
+• AVOID AudioServicesPlaySystemSound - just add a comment instead
+
+CODE VALIDATION (Before returning):
+• Mentally trace through each file to ensure all braces and parentheses match
+• Verify that no expressions are left incomplete
+• Check that all SwiftUI modifiers are properly chained with closing parentheses
 
 Return JSON with your creative implementation:
 {{

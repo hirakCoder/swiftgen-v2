@@ -282,6 +282,8 @@ class SwiftGenPipeline:
         # Handle LLMResponse object from our router
         if hasattr(result, 'success'):
             if result.success:
+                # LOG RAW CONTENT BEFORE PARSING
+                print(f"[PIPELINE] RAW LLM content (first 1000 chars): {result.content[:1000]}")
                 return json.loads(result.content)
             else:
                 raise Exception(f"LLM generation failed: {result.error}")

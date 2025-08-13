@@ -33,18 +33,19 @@ class LLMRouter:
     
     def __init__(self):
         # Provider configuration
+        # IMPORTANT: GPT-4 is now priority 1 due to Claude's Swift syntax issues
         self.providers = {
             LLMProvider.CLAUDE: {
                 'api_key_env': 'CLAUDE_API_KEY',
                 'timeout': 45,  # Increased timeout for better reliability
-                'priority': 1,  # Best for SwiftUI
+                'priority': 2,  # Demoted due to Swift syntax issues (Aug 13, 2025)
                 'strengths': ['ui', 'swiftui', 'architecture']
             },
             LLMProvider.GPT4: {
                 'api_key_env': 'OPENAI_API_KEY',
                 'timeout': 45,  # Increased timeout for better reliability
-                'priority': 2,  # Good for algorithms
-                'strengths': ['logic', 'algorithms', 'data']
+                'priority': 1,  # Promoted to priority 1 - better Swift syntax
+                'strengths': ['swift', 'swiftui', 'ios', 'logic', 'algorithms', 'data']
             },
             LLMProvider.GROK: {
                 'api_key_env': 'XAI_API_KEY',

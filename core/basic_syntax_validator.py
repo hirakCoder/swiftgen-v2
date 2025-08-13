@@ -69,6 +69,24 @@ class BasicSyntaxValidator:
                     'issue': 'Orphaned closing parenthesis',
                     'severity': 'error'
                 })
+            
+            # Check for malformed ternary operators (e.g., "condition ?)" without true/false values)
+            if '?)' in line and ':' not in line:
+                issues.append({
+                    'line': i,
+                    'issue': 'Malformed ternary operator - missing true/false values',
+                    'severity': 'error'
+                })
+            
+            # Check for incomplete ternary on current and next line
+            if '?' in line and ':' not in line:
+                # Check if colon is on the next line
+                if i + 1 < len(lines) and ':' not in lines[i + 1]:
+                    issues.append({
+                        'line': i,
+                        'issue': 'Incomplete ternary operator',
+                        'severity': 'error'
+                    })
         
         # Check for missing imports
         if 'UINotificationFeedbackGenerator' in content or 'UIImpactFeedbackGenerator' in content:
@@ -205,6 +223,24 @@ class BasicSyntaxValidator:
                 line_num = issue['line'] - 1
                 if line_num < len(lines):
                     lines[line_num] = lines[line_num].replace(')', '', 1)
+            
+            elif issue['issue'] == 'Malformed ternary operator - missing true/false values':
+                # Fix malformed ternary by completing it
+                line_num = issue['line'] - 1
+                if line_num < len(lines):
+                    line = lines[line_num]
+                    # Replace "condition ?)" with complete ternary
+                    if '?)' in line:
+                        # Extract the condition part
+                        parts = line.split('?)')
+                        if len(parts) == 2:
+                            # Guess reasonable values based on context
+                            if 'Color' in line or 'background' in line:
+                                lines[line_num] = parts[0] + '? .blue : .gray)' + parts[1]
+                            elif 'opacity' in line:
+                                lines[line_num] = parts[0] + '? 1.0 : 0.5)' + parts[1]
+                            else:
+                                lines[line_num] = parts[0] + '? true : false)' + parts[1]
             
             elif issue['issue'] == 'Missing import UIKit for haptic feedback':
                 # Add UIKit import after SwiftUI import

@@ -50,6 +50,12 @@ class SwiftCompilationFixer:
             
             # ============ TYPE ERRORS ============
             SwiftErrorPattern(
+                pattern=r"cannot find type '(Color|View|Text|Image|Button|VStack|HStack|ZStack)' in scope",
+                error_type="missing_swiftui_import",
+                fix_function="_fix_missing_swiftui_import",
+                description="Missing SwiftUI import"
+            ),
+            SwiftErrorPattern(
                 pattern=r"cannot convert value of type '([^']+)' to expected argument type '([^']+)'",
                 error_type="type_mismatch",
                 fix_function="_fix_type_mismatch",
@@ -291,6 +297,18 @@ class SwiftCompilationFixer:
         return fixes
     
     # ============ SPECIFIC FIX FUNCTIONS ============
+    
+    def _fix_missing_swiftui_import(self, content: str, error: str) -> str:
+        """Fix missing SwiftUI import for SwiftUI types"""
+        # Check if SwiftUI is already imported
+        if 'import SwiftUI' not in content:
+            # Add SwiftUI import after Foundation import if present
+            if 'import Foundation' in content:
+                content = content.replace('import Foundation', 'import Foundation\nimport SwiftUI')
+            else:
+                # Add at the beginning of file
+                content = 'import SwiftUI\n' + content
+        return content
     
     def _fix_argument_label(self, content: str, error: str) -> str:
         """Fix incorrect argument labels"""
