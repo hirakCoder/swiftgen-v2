@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwiftGen V2 - Integration Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-section {
+            background: #2a2a2a;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0051D5;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        .status.success {
+            background: #2a4a2a;
+            border: 1px solid #4a7a4a;
+        }
+        .status.error {
+            background: #4a2a2a;
+            border: 1px solid #7a4a4a;
+        }
+        .status.info {
+            background: #2a3a4a;
+            border: 1px solid #4a6a7a;
+        }
+        #wsMessages {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+        h1 {
+            color: #007AFF;
+        }
+        h2 {
+            color: #34C759;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 SwiftGen V2 - Integration Test Suite</h1>
+    <p>Test the backend integration with simple, direct API calls</p>
+
+    <!-- Backend Status -->
+    <div class="test-section">
+        <h2>1. Backend Status</h2>
+        <button onclick="testBackendStatus()">Check Backend</button>
+        <div id="backendStatus" class="status info">Click to test backend connection</div>
+    </div>
+
+    <!-- Generate App Test -->
+    <div class="test-section">
+        <h2>2. Generate Simple App</h2>
+        <button onclick="testGenerateApp('timer')">Generate Timer App</button>
+        <button onclick="testGenerateApp('counter')">Generate Counter App</button>
+        <button onclick="testGenerateApp('todo')">Generate Todo App</button>
+        <div id="generateStatus" class="status info">Click a button to generate an app</div>
+        <div>Project ID: <span id="currentProjectId">None</span></div>
+    </div>
+
+    <!-- Modify App Test -->
+    <div class="test-section">
+        <h2>3. Modify Existing App</h2>
+        <button onclick="testModifyApp('dark')">Add Dark Mode</button>
+        <button onclick="testModifyApp('color')">Change Colors</button>
+        <button onclick="testModifyApp('button')">Add Button</button>
+        <div id="modifyStatus" class="status info">Generate an app first, then modify it</div>
+    </div>
+
+    <!-- WebSocket Test -->
+    <div class="test-section">
+        <h2>4. WebSocket Connection</h2>
+        <button onclick="testWebSocket()">Connect WebSocket</button>
+        <button onclick="closeWebSocket()">Close WebSocket</button>
+        <div id="wsStatus" class="status info">WebSocket not connected</div>
+        <div id="wsMessages"></div>
+    </div>
+
+    <!-- Test Results Summary -->
+    <div class="test-section">
+        <h2>5. Test Results</h2>
+        <div id="testSummary" class="status info">
+            Run tests above to see results
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentProjectId = null;
+        let testResults = {
+            backend: false,
+            generation: false,
+            modification: false,
+            websocket: false
+        };
+
+        // Test backend status
+        async function testBackendStatus() {
+            const statusDiv = document.getElementById('backendStatus');
+            statusDiv.textContent = 'Testing backend connection...';
+            statusDiv.className = 'status info';
+            
+            try {
+                const response = await fetch('/api');
+                const data = await response.json();
+                
+                if (data.status === 'online') {
+                    statusDiv.textContent = `✅ Backend online - Version ${data.version}`;
+                    statusDiv.className = 'status success';
+                    testResults.backend = true;
+                } else {
+                    statusDiv.textContent = '❌ Backend not responding correctly';
+                    statusDiv.className = 'status error';
+                }
+            } catch (error) {
+                statusDiv.textContent = `❌ Backend connection failed: ${error.message}`;
+                statusDiv.className = 'status error';
+            }
+            updateSummary();
+        }
+
+        // Test app generation
+        async function testGenerateApp(type) {
+            const statusDiv = document.getElementById('generateStatus');
+            statusDiv.textContent = `Generating ${type} app...`;
+            statusDiv.className = 'status info';
+            
+            const descriptions = {
+                timer: 'Create a simple timer app',
+                counter: 'Create a counter app with increment and decrement',
+                todo: 'Create a todo list app'
+            };
+            
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        description: descriptions[type],
+                        app_name: `Test${type.charAt(0).toUpperCase() + type.slice(1)}`,
+                        provider: 'grok'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentProjectId = data.project_id;
+                    document.getElementById('currentProjectId').textContent = currentProjectId;
+                    statusDiv.textContent = `✅ ${type} app generated successfully! Project: ${currentProjectId}`;
+                    statusDiv.className = 'status success';
+                    testResults.generation = true;
+                    
+                    // Enable modification buttons
+                    document.getElementById('modifyStatus').textContent = 'Ready to modify the app';
+                } else {
+                    statusDiv.textContent = `❌ Generation failed: ${data.error || 'Unknown error'}`;
+                    statusDiv.className = 'status error';
+                }
+            } catch (error) {
+                statusDiv.textContent = `❌ Request failed: ${error.message}`;
+                statusDiv.className = 'status error';
+            }
+            updateSummary();
+        }
+
+        // Test app modification
+        async function testModifyApp(type) {
+            const statusDiv = document.getElementById('modifyStatus');
+            
+            if (!currentProjectId) {
+                statusDiv.textContent = '⚠️ Generate an app first before modifying';
+                statusDiv.className = 'status error';
+                return;
+            }
+            
+            statusDiv.textContent = `Applying ${type} modification...`;
+            statusDiv.className = 'status info';
+            
+            const modifications = {
+                dark: 'Add a dark mode toggle',
+                color: 'Change the background color to blue',
+                button: 'Add a reset button'
+            };
+            
+            try {
+                const response = await fetch('/api/modify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_id: currentProjectId,
+                        description: modifications[type],
+                        app_name: 'TestApp',
+                        provider: 'grok'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    statusDiv.textContent = `✅ ${type} modification applied successfully!`;
+                    statusDiv.className = 'status success';
+                    testResults.modification = true;
+                } else {
+                    statusDiv.textContent = `❌ Modification failed: ${data.error || 'Unknown error'}`;
+                    statusDiv.className = 'status error';
+                }
+            } catch (error) {
+                statusDiv.textContent = `❌ Request failed: ${error.message}`;
+                statusDiv.className = 'status error';
+            }
+            updateSummary();
+        }
+
+        // Test WebSocket connection
+        function testWebSocket() {
+            const statusDiv = document.getElementById('wsStatus');
+            const messagesDiv = document.getElementById('wsMessages');
+            
+            if (!currentProjectId) {
+                // Use test project ID
+                currentProjectId = 'test_' + Math.random().toString(36).substring(7);
+                document.getElementById('currentProjectId').textContent = currentProjectId;
+            }
+            
+            statusDiv.textContent = 'Connecting WebSocket...';
+            statusDiv.className = 'status info';
+            messagesDiv.innerHTML = '';
+            
+            ws = new WebSocket(`ws://localhost:8000/ws/${currentProjectId}`);
+            
+            ws.onopen = () => {
+                statusDiv.textContent = `✅ WebSocket connected (ID: ${currentProjectId})`;
+                statusDiv.className = 'status success';
+                testResults.websocket = true;
+                updateSummary();
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                const timestamp = new Date().toLocaleTimeString();
+                messagesDiv.innerHTML += `<div>[${timestamp}] ${data.type}: ${data.message || JSON.stringify(data)}</div>`;
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            };
+            
+            ws.onerror = (error) => {
+                statusDiv.textContent = '❌ WebSocket error';
+                statusDiv.className = 'status error';
+            };
+            
+            ws.onclose = () => {
+                statusDiv.textContent = '⚠️ WebSocket disconnected';
+                statusDiv.className = 'status info';
+            };
+        }
+
+        // Close WebSocket
+        function closeWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+                document.getElementById('wsStatus').textContent = 'WebSocket closed';
+                document.getElementById('wsStatus').className = 'status info';
+            }
+        }
+
+        // Update test summary
+        function updateSummary() {
+            const summaryDiv = document.getElementById('testSummary');
+            const passed = Object.values(testResults).filter(r => r).length;
+            const total = Object.keys(testResults).length;
+            
+            let summary = `Test Results: ${passed}/${total} passed\n\n`;
+            summary += `Backend Connection: ${testResults.backend ? '✅' : '❌'}\n`;
+            summary += `App Generation: ${testResults.generation ? '✅' : '❌'}\n`;
+            summary += `App Modification: ${testResults.modification ? '✅' : '❌'}\n`;
+            summary += `WebSocket: ${testResults.websocket ? '✅' : '❌'}`;
+            
+            summaryDiv.textContent = summary;
+            summaryDiv.className = passed === total ? 'status success' : 'status info';
+        }
+
+        // Auto-test backend on load
+        window.addEventListener('load', () => {
+            setTimeout(testBackendStatus, 500);
+        });
+    </script>
+</body>
+</html>
