@@ -287,8 +287,9 @@ async def modify_app(request: GenerateRequest):
     start_time = time.time()
     
     try:
-        # Import modification handler
+        # Import modification handlers
         from core.modification_handler import IntelligentModificationRouter
+        from core.smart_modification_router import smart_router
         
         # Get project path
         project_id = request.project_id or request.app_name.lower().replace(' ', '_')
@@ -337,10 +338,16 @@ async def modify_app(request: GenerateRequest):
         # Use the unified request text property
         modification_text = request.request_text
         
-        result = await IntelligentModificationRouter.route_modification(
+        # Create status callback for WebSocket updates
+        async def status_callback(status_data):
+            await manager.send_message(project_id, status_data)
+        
+        # Use smart router for better timeout handling
+        result = await smart_router.route_modification(
             request=modification_text,
             project_path=project_path,
-            llm_service=llm_service
+            llm_service=llm_service,
+            status_callback=status_callback
         )
         
         if result['success']:
