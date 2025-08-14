@@ -73,13 +73,19 @@ class ProductionReadyPipeline:
         # Strategy 3: Template fallback
         await self._send_status(status_callback, "🎯 Using optimized template for guaranteed success...")
         
+        # INTERNAL: Log template fallback (can be commented out for production)
+        await self._send_status(status_callback, "⚠️ [INTERNAL] LLM generation failed, falling back to template")
+        
         template_result = await self._use_template_fallback(
             description, app_name, project_id, status_callback
         )
         
         if template_result['success']:
             await self._send_status(status_callback, "✅ App generated from tested template!")
-            self.final_strategy = "Template"
+            # INTERNAL: Notify which template was used
+            app_type = TemplateFallbackSystem.detect_app_type(description)
+            await self._send_status(status_callback, f"📋 [INTERNAL] Used {app_type} template")
+            self.final_strategy = f"Template ({app_type})"
             return self._success_response(project_path, time.time() - start_time)
         
         # This should never happen, but just in case

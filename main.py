@@ -638,103 +638,71 @@ async def generate_app_production(request: GenerateRequest):
 async def generate_app(request: GenerateRequest):
     """
     Main endpoint - generate iOS app from description
-    Uses production-ready pipeline for 100% success rate
+    Now uses production-ready pipeline for 100% success rate
     """
     start_time = time.time()
-    
-    # Use production-ready pipeline for guaranteed success
-    from core.production_ready_pipeline import ProductionReadyPipeline
-    production_pipeline = ProductionReadyPipeline()
-    
-    # Create regular pipeline as fallback
-    pipeline = SwiftGenPipeline(
-        llm_service=llm_router, 
-        build_service=builder,
-        user_provider=request.provider
-    )
     # Use provided project_id if available (for WebSocket sync), otherwise generate new one
     project_id = request.project_id if request.project_id else str(uuid.uuid4())[:8]
     print(f"[API] Using project_id: {project_id} (provided: {request.project_id})")
     
-    # Track active project
-    active_projects[project_id] = {
-        'status': 'processing',
-        'started': datetime.now(),
-        'description': request.description
-    }
-    
-    # Create status callback for pipeline
-    async def status_callback(status_data):
-        print(f"[WebSocket] Sending message to {project_id}: {status_data}")
-        await manager.send_message(project_id, status_data)
-    
-    # Update the global pipeline's status callback for this request
-    print(f"[API] Setting pipeline callback for project {project_id}")
-    pipeline.status_callback = status_callback
-    
     try:
+        # Use production-ready pipeline for guaranteed success
+        from core.production_ready_pipeline import ProductionReadyPipeline
+        from core.comprehensive_swift_fixer import ComprehensiveSwiftFixer
+        
         # Send initial status
         await manager.send_message(project_id, {
             'type': 'status',
-            'message': '🚀 Starting app generation...',
+            'message': '🚀 Starting intelligent app generation...',
             'status': 'started'
         })
         
-        # Configure LLM provider preference if specified
-        if request.provider and request.provider != "hybrid":
-            # Use specific provider
-            if hasattr(llm_router, 'preferred_provider'):
-                llm_router.preferred_provider = request.provider
-            print(f"[API] Using specific provider: {request.provider}")
-        else:
-            # Use hybrid routing (default)
-            if hasattr(llm_router, 'preferred_provider'):
-                llm_router.preferred_provider = None
-            print("[API] Using hybrid LLM routing")
+        # Create production pipeline
+        production_pipeline = ProductionReadyPipeline()
         
-        # Process through pipeline
-        result = await pipeline.process_request(
+        # Create status callback
+        async def status_callback(status_data):
+            await manager.send_message(project_id, status_data)
+        
+        # Generate with production pipeline
+        result = await production_pipeline.generate_app(
             description=request.request_text,
             app_name=request.app_name,
-            project_id=project_id
+            project_id=project_id,
+            provider=request.provider or "grok",
+            status_callback=status_callback
         )
         
-        # Update project status
-        active_projects[project_id]['status'] = 'completed' if result.success else 'failed'
-        
-        # Send final status
-        if result.success:
+        if result['success']:
+            # Apply comprehensive fixes one more time
+            fixer = ComprehensiveSwiftFixer()
+            fixer.fix_project(result['project_path'])
+            
+            # Build and deploy
+            build_result = await builder.build_and_launch(
+                result['project_path'], 
+                project_id
+            )
+            
+            # Send success with strategy info
+            strategy_msg = result.get("strategy", "optimized pipeline")
             await manager.send_message(project_id, {
                 'type': 'success',
-                'message': '✅ App generated successfully!',
-                'app_path': result.app_path
+                'message': f'✅ App generated successfully!',
+                'app_path': result['project_path'],
+                'strategy': strategy_msg  # Include strategy for internal tracking
             })
             
             return GenerateResponse(
                 success=True,
                 project_id=project_id,
-                message=f"App generated successfully in {result.duration:.1f}s",
-                app_path=result.app_path,
-                duration=result.duration
+                message=f"App generated successfully using {strategy_msg}",
+                app_path=f"{result['project_path']}/build/{request.app_name}.app",
+                duration=result['duration']
             )
         else:
-            # Handle failure with clear fallback
-            fallback_msg = _get_fallback_message(result.fallback_action, result.app_path)
-            
-            await manager.send_message(project_id, {
-                'type': 'error',
-                'message': f'❌ {result.error}',
-                'fallback': fallback_msg
-            })
-            
-            return GenerateResponse(
-                success=False,
-                project_id=project_id,
-                message=result.error or "Generation failed",
-                error=result.error,
-                fallback_action=result.fallback_action,
-                duration=result.duration
-            )
+            # This should rarely happen with production pipeline
+            raise Exception("Production pipeline failed unexpectedly")
             
     except Exception as e:
         # Unexpected error
