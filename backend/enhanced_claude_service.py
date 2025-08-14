@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
 import anthropic
+import openai
 import requests
 from dotenv import load_dotenv
 
@@ -79,7 +80,7 @@ class EnhancedClaudeService:
                 name="GPT-4 Turbo",
                 provider="openai",
                 api_key_env="OPENAI_API_KEY",
-                model_id="gpt-4-turbo-preview",
+                model_id="gpt-4-0125-preview",  # Working GPT-4 model
                 max_tokens=4096,  # GPT-4 Turbo max completion tokens
                 temperature=0.7
             ),
@@ -87,7 +88,7 @@ class EnhancedClaudeService:
                 name="xAI Grok",
                 provider="xai",
                 api_key_env="XAI_API_KEY",
-                model_id="grok-beta",
+                model_id="grok-3",  # Latest Grok model (aliases: grok-3-latest, grok-3-beta)
                 max_tokens=8192  # Increased to match Claude
             )
         ]
@@ -289,7 +290,7 @@ Return a JSON response with this EXACT structure:
                     fixed_json = result
                     
                     # Fix unescaped newlines and tabs in JSON strings
-                    import re
+                    # re is already imported at the top of the file
                     # This pattern finds string values and fixes escape sequences
                     def fix_string_escapes(text):
                         # Find all string values in JSON
@@ -471,7 +472,7 @@ Return a JSON response with this EXACT structure:
             
             # Generate with xAI
             payload = {
-                "model": "grok-2",
+                "model": self.current_model.model_id,  # Use configured model ID
                 "messages": messages,
                 "temperature": self.current_model.temperature,
                 "max_tokens": self.current_model.max_tokens,

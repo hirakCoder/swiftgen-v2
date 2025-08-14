@@ -1,0 +1,101 @@
+{
+  "total_tests": 10,
+  "successful": 10,
+  "failed": 0,
+  "success_rate": 100.0,
+  "syntax_validity_rate": 100.0,
+  "average_duration": 2.2676774978637697,
+  "average_validation_score": 100.0,
+  "results": [
+    {
+      "app": "Counter",
+      "complexity": "simple",
+      "success": true,
+      "duration": 8.445319890975952,
+      "validation_score": 100.0,
+      "files": 5,
+      "error": null
+    },
+    {
+      "app": "Timer",
+      "complexity": "simple",
+      "success": true,
+      "duration": 1.6415560245513916,
+      "validation_score": 100.0,
+      "files": 5,
+      "error": null
+    },
+    {
+      "app": "DiceRoller",
+      "complexity": "simple",
+      "success": true,
+      "duration": 1.9829351902008057,
+      "validation_score": 100.0,
+      "files": 5,
+      "error": null
+    },
+    {
+      "app": "GalaxyTimer",
+      "complexity": "themed",
+      "success": true,
+      "duration": 1.5503277778625488,
+      "validation_score": 100.0,
+      "files": 5,
+      "error": null
+    },
+    {
+      "app": "NeonCalc",
+      "complexity": "themed",
+      "success": true,
+      "duration": 1.2128021717071533,
+      "validation_score": 100.0,
+      "files": 6,
+      "error": null
+    },
+    {
+      "app": "MartianCounter",
+      "complexity": "themed",
+      "success": true,
+      "duration": 1.1037609577178955,
+      "validation_score": 100.0,
+      "files": 5,
+      "error": null
+    },
+    {
+      "app": "TodoList",
+      "complexity": "complex",
+      "success": true,
+      "duration": 1.9286658763885498,
+      "validation_score": 100.0,
+      "files": 7,
+      "error": null
+    },
+    {
+      "app": "Weather",
+      "complexity": "complex",
+      "success": true,
+      "duration": 1.8316290378570557,
+      "validation_score": 100.0,
+      "files": 5,
+      "error": null
+    },
+    {
+      "app": "Notes",
+      "complexity": "complex",
+      "success": true,
+      "duration": 1.6468400955200195,
+      "validation_score": 100.0,
+      "files": 5,
+      "error": null
+    },
+    {
+      "app": "Calculator",
+      "complexity": "complex",
+      "success": true,
+      "duration": 1.3329379558563232,
+      "validation_score": 100.0,
+      "files": 6,
+      "error": null
+    }
+  ]
+}

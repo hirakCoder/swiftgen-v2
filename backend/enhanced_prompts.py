@@ -40,7 +40,7 @@ MODERN SWIFT PATTERNS (MANDATORY):
 6. Concurrency: NEVER use DispatchSemaphore with async/await
 7. Threading: Use @MainActor or MainActor.run, NOT DispatchQueue.main
 
-CRITICAL SYNTAX RULES - MUST FOLLOW:
+CRITICAL SYNTAX RULES TO PREVENT COMPILATION ERRORS:
 1. ALWAYS import SwiftUI in every Swift file
 2. ALWAYS import Combine when using @Published, ObservableObject, or any Combine features
 3. NEVER use undefined types or properties
@@ -49,7 +49,12 @@ CRITICAL SYNTAX RULES - MUST FOLLOW:
 6. ALWAYS use double quotes " for strings, NEVER single quotes '
 7. Every View must have a body property that returns some View
 8. NEVER leave empty implementations or undefined variables
-9. ALWAYS ensure proper Swift syntax with matching braces and parentheses
+9. CRITICAL: EVERY opening delimiter MUST have a closing delimiter:
+   - Every ( must have a matching )
+   - Every { must have a matching }
+   - Every [ must have a matching ]
+   - Count your delimiters! Multi-line modifiers like .overlay( MUST close with )
+   - Example: .overlay(content) or .overlay(\n    content\n) <- Note the closing )
 10. For the main App file, ALWAYS use @main attribute
 11. NEVER use ... in class/struct/enum definitions - always provide complete implementation
 12. Color names: Use .gray (NOT .darkGray), .blue, .red, .green, .orange, .yellow, .pink, .purple

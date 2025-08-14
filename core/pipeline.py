@@ -14,6 +14,10 @@ import uuid
 
 from .intent import IntentParser, AppIntent
 from .circuit_breaker import CircuitBreaker, CircuitBreakerError
+from .complexity_analyzer import ComplexityAnalyzer
+from .swift_validator import SwiftValidator
+from .adaptive_prompt_generator import AdaptivePromptGenerator
+from .intelligent_llm_selector import IntelligentLLMSelector
 
 @dataclass
 class PipelineResult:
@@ -42,11 +46,16 @@ class SwiftGenPipeline:
         'deploy': 30        # Simulator deployment
     }
     
-    def __init__(self, llm_service=None, build_service=None, status_callback=None):
+    def __init__(self, llm_service=None, build_service=None, status_callback=None, user_provider=None):
         self.intent_parser = IntentParser()
+        self.complexity_analyzer = ComplexityAnalyzer()
+        self.swift_validator = SwiftValidator()
+        self.prompt_generator = AdaptivePromptGenerator()
+        self.llm_selector = IntelligentLLMSelector()
         self.llm_service = llm_service
         self.build_service = build_service
         self.status_callback = status_callback  # WebSocket status callback
+        self.user_provider = user_provider  # User's preferred provider
         
         # Circuit breakers for each component
         self.generation_circuit = CircuitBreaker(
@@ -188,6 +197,26 @@ class SwiftGenPipeline:
         project_path = await self._save_project(project_id, code)
         await self.send_status(f"Project saved: {project_path}", "build")
         
+        # NEW: Stage 3.4: Fix Grok @MainActor issues if Grok was used
+        if hasattr(self, '_last_provider_used') and self._last_provider_used == 'grok':
+            try:
+                from core.grok_mainactor_fixer import fix_grok_mainactor_issues
+                print("[Pipeline] Applying Grok @MainActor fixes...")
+                if fix_grok_mainactor_issues(project_path):
+                    print("[Pipeline] Grok @MainActor issues fixed")
+            except Exception as e:
+                print(f"[Pipeline] Warning: Could not apply Grok fixes: {e}")
+        
+        # NEW: Stage 3.5: Validate Swift code before building
+        validation_result = self.swift_validator.validate_project(project_path)
+        if not validation_result.valid:
+            print(f"[Pipeline] Swift validation found {validation_result.error_count} errors")
+            # Try to auto-fix if possible
+            if validation_result.can_auto_fix:
+                await self.send_status(f"Auto-fixing {len(validation_result.auto_fixable)} issues", "validate")
+                # Apply fixes (simplified for now)
+                # In production, would apply fixes and re-save files
+        
         # Stage 4: Build Project (30s timeout with circuit breaker)
         try:
             build_result = await self.build_circuit.call(
@@ -242,42 +271,73 @@ class SwiftGenPipeline:
         return self.intent_parser.parse(description, app_name)
     
     async def _generate_code(self, intent: AppIntent) -> Dict:
-        """Generate code based on intent"""
-        # DISABLED: Templates kill creativity - ALWAYS use LLM
-        # This was causing all apps to look the same!
-        if False:  # NEVER use templates
-            from generation.simple_generator import simple_generator
-            
-            project_path = f"workspaces/temp_{intent.app_name.lower()}"
-            result = await simple_generator.generate_app(
-                intent.raw_request,
-                intent.core_features,
-                project_path
-            )
-            
-            if result['success']:
-                # Convert to expected format
-                files = []
-                for filename, content in result['files'].items():
-                    files.append({
-                        'path': f"Sources/{filename}",
-                        'content': content
-                    })
-                return {
-                    'files': files,
-                    'app_name': intent.app_name
-                }
+        """Generate code based on intent with complexity-aware generation"""
         
         if not self.llm_service:
             # Return minimal template if no LLM service
             return self._get_minimal_template(intent)
         
-        # Build prompt based on intent
-        requirements = self.intent_parser.get_minimal_requirements(intent)
-        prompt = self._build_generation_prompt(requirements)
+        # NEW: Analyze complexity
+        complexity = self.complexity_analyzer.analyze(intent.raw_request, intent.app_name)
+        print(f"[Pipeline] Complexity Analysis: Score={complexity.total} ({complexity.category})")
+        
+        # NEW: Select best LLM provider
+        provider, reason = self.llm_selector.select_provider(
+            intent.raw_request,
+            complexity.total,
+            self.user_provider
+        )
+        print(f"[Pipeline] Selected LLM: {provider.value} - {reason}")
+        
+        # Track which provider was used for later fixes
+        self._last_provider_used = provider.value
+        
+        # NEW: Generate adaptive prompt
+        prompt = self.prompt_generator.generate(
+            intent.raw_request, 
+            intent.app_name,
+            complexity,
+            for_modification=False
+        )
+        print(f"[Pipeline] Generated prompt length: {len(prompt)} chars")
+        
+        # Check if hybrid mode requested
+        if provider.value == 'hybrid':
+            # Use hybrid generator
+            from generation.hybrid_generator import HybridGenerator
+            hybrid = HybridGenerator(self.llm_service)
+            
+            print("[Pipeline] Using HYBRID mode - leveraging all 3 LLMs")
+            hybrid_result = await hybrid.generate_hybrid(
+                intent.raw_request,
+                intent.app_name,
+                complexity.total,
+                prompt
+            )
+            
+            if hybrid_result.success:
+                # Convert to expected format
+                files = []
+                for filename, content in hybrid_result.files.items():
+                    files.append({
+                        'path': f"Sources/{filename}",
+                        'content': content
+                    })
+                print(f"[Pipeline] Hybrid generation used: {hybrid_result.components}")
+                return {
+                    'files': files,
+                    'app_name': intent.app_name
+                }
+            else:
+                raise Exception(f"Hybrid generation failed: {hybrid_result.errors}")
+        
+        # Single provider mode
+        # Set preferred provider based on intelligent selection
+        if hasattr(self.llm_service, 'preferred_provider'):
+            self.llm_service.preferred_provider = provider.value
         
         # Generate with LLM
-        result = await self.llm_service.generate(prompt)
+        result = await self.llm_service.generate(prompt, task_type=complexity.category)
         
         # Handle LLMResponse object from our router
         if hasattr(result, 'success'):

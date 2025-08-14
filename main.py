@@ -43,6 +43,8 @@ from core.pipeline import SwiftGenPipeline
 from core.circuit_breaker import CircuitBreakerError
 from generation.llm_router import LLMRouter
 from build.direct_build import DirectBuildSystem
+from core.production_pipeline import get_pipeline  # Production fixes
+from core.production_syntax_validator import SwiftSyntaxValidator
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -111,7 +113,6 @@ class ConnectionManager:
 manager = ConnectionManager()
 llm_router = LLMRouter()
 builder = DirectBuildSystem()
-pipeline = SwiftGenPipeline(llm_service=llm_router, build_service=builder)
 
 # Active projects tracking
 active_projects = {}
@@ -477,8 +478,90 @@ async def modify_app(request: GenerateRequest):
 
 # Remove the problematic chat endpoint - frontend should use /api/generate directly
 
+@app.post("/api/generate/production", response_model=GenerateResponse)
+async def generate_app_production(request: GenerateRequest):
+    """
+    Production endpoint with all fixes applied
+    """
+    start_time = time.time()
+    project_id = request.project_id if request.project_id else str(uuid.uuid4())[:8]
+    
+    try:
+        # Use production pipeline
+        production_pipeline = get_pipeline()
+        
+        # Send initial status
+        await manager.send_message(project_id, {
+            'type': 'status',
+            'message': '🚀 Starting production app generation...',
+            'status': 'started'
+        })
+        
+        # Generate with production fixes
+        result = await production_pipeline.generate_app(
+            description=request.request_text,
+            app_name=request.app_name,
+            provider=request.provider
+        )
+        
+        if result.get("success"):
+            # Build and deploy
+            project_path = result.get("project_path", f"workspaces/{project_id}")
+            build_result = await builder.build_and_launch(project_path, project_id)
+            
+            if build_result.get('success'):
+                await manager.send_message(project_id, {
+                    'type': 'success',
+                    'message': '✅ App generated successfully with production fixes!',
+                    'app_path': project_path
+                })
+                
+                return GenerateResponse(
+                    success=True,
+                    project_id=project_id,
+                    message=f"App generated successfully in {time.time() - start_time:.1f}s",
+                    app_path=project_path,
+                    duration=time.time() - start_time
+                )
+        
+        # Handle failure
+        error = result.get("error", "Generation failed")
+        await manager.send_message(project_id, {
+            'type': 'error',
+            'message': f'❌ {error}'
+        })
+        
+        return GenerateResponse(
+            success=False,
+            project_id=project_id,
+            message=error,
+            error=error,
+            duration=time.time() - start_time
+        )
+        
+    except Exception as e:
+        error_msg = str(e)
+        await manager.send_message(project_id, {
+            'type': 'error',
+            'message': f'❌ Error: {error_msg}'
+        })
+        
+        return GenerateResponse(
+            success=False,
+            project_id=project_id,
+            message="Generation failed",
+            error=error_msg,
+            duration=time.time() - start_time
+        )
+
 @app.post("/api/generate", response_model=GenerateResponse)
 async def generate_app(request: GenerateRequest):
+    # Create pipeline with user's provider preference
+    pipeline = SwiftGenPipeline(
+        llm_service=llm_router, 
+        build_service=builder,
+        user_provider=request.provider
+    )
     """
     Main endpoint - generate iOS app from description
     """
