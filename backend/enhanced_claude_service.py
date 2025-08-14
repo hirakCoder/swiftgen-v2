@@ -281,6 +281,22 @@ Return a JSON response with this EXACT structure:
                 
                 # CRITICAL: Fix common JSON issues BEFORE parsing
                 original_result = result
+                
+                # Special handling for Grok responses
+                if self.current_model and self.current_model.provider == "xai":
+                    try:
+                        from backend.grok_json_fixer import GrokJSONFixer
+                        result = GrokJSONFixer.fix_grok_json(result)
+                        logger.info("[GROK] Applied Grok-specific JSON fixes")
+                    except ImportError:
+                        try:
+                            # Fallback to direct import
+                            from grok_json_fixer import GrokJSONFixer
+                            result = GrokJSONFixer.fix_grok_json(result)
+                            logger.info("[GROK] Applied Grok-specific JSON fixes")
+                        except ImportError:
+                            logger.warning("[GROK] GrokJSONFixer not available")
+                
                 try:
                     result = json.loads(result)
                 except json.JSONDecodeError as e:
@@ -347,6 +363,40 @@ Return a JSON response with this EXACT structure:
                 result["generated_by_llm"] = self.current_model.provider
 
             logger.info(f"[ENHANCED_CLAUDE] Successfully parsed response with {len(result.get('files', []))} files")
+            
+            # Apply Grok-specific Swift syntax fixes if using Grok
+            if self.current_model and self.current_model.provider == "xai" and "files" in result:
+                try:
+                    from backend.grok_syntax_fixer import GrokSyntaxFixer
+                    result["files"] = GrokSyntaxFixer.validate_and_fix_files(result["files"])
+                    logger.info("[GROK] Applied Swift syntax fixes to generated files")
+                except ImportError:
+                    try:
+                        from grok_syntax_fixer import GrokSyntaxFixer
+                        result["files"] = GrokSyntaxFixer.validate_and_fix_files(result["files"])
+                        logger.info("[GROK] Applied Swift syntax fixes to generated files")
+                    except ImportError:
+                        logger.warning("[GROK] GrokSyntaxFixer not available")
+                
+                # Also complete missing files for Grok
+                try:
+                    from backend.grok_file_completer import GrokFileCompleter
+                    original_count = len(result["files"])
+                    result["files"] = GrokFileCompleter.complete_missing_files(result["files"])
+                    added_count = len(result["files"]) - original_count
+                    if added_count > 0:
+                        logger.info(f"[GROK] Added {added_count} missing files to complete references")
+                except ImportError:
+                    try:
+                        from grok_file_completer import GrokFileCompleter
+                        original_count = len(result["files"])
+                        result["files"] = GrokFileCompleter.complete_missing_files(result["files"])
+                        added_count = len(result["files"]) - original_count
+                        if added_count > 0:
+                            logger.info(f"[GROK] Added {added_count} missing files to complete references")
+                    except ImportError:
+                        logger.warning("[GROK] GrokFileCompleter not available")
+            
             return result
 
         except Exception as e:

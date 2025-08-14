@@ -40,7 +40,7 @@ class SwiftGenPipeline:
     TIMEOUTS = {
         'total': 180,       # Total request timeout (3 minutes for complex apps)
         'intent': 2,        # Intent parsing
-        'generation': 20,   # LLM generation (allow for retries)
+        'generation': 45,   # LLM generation (increased for hybrid mode parallel execution)
         'validation': 3,    # Code validation
         'build': 120,       # Xcode build (2 minutes for medium apps)
         'deploy': 30        # Simulator deployment
@@ -197,15 +197,9 @@ class SwiftGenPipeline:
         project_path = await self._save_project(project_id, code)
         await self.send_status(f"Project saved: {project_path}", "build")
         
-        # NEW: Stage 3.4: Fix Grok @MainActor issues if Grok was used
-        if hasattr(self, '_last_provider_used') and self._last_provider_used == 'grok':
-            try:
-                from core.grok_mainactor_fixer import fix_grok_mainactor_issues
-                print("[Pipeline] Applying Grok @MainActor fixes...")
-                if fix_grok_mainactor_issues(project_path):
-                    print("[Pipeline] Grok @MainActor issues fixed")
-            except Exception as e:
-                print(f"[Pipeline] Warning: Could not apply Grok fixes: {e}")
+        # DISABLED: Using advanced MainActor fixer in build process instead
+        # The old grok_mainactor_fixer was causing duplicate @MainActor annotations
+        # Now handled by core.mainactor_concurrency_fixer in direct_build.py
         
         # NEW: Stage 3.5: Validate Swift code before building
         validation_result = self.swift_validator.validate_project(project_path)
@@ -303,11 +297,17 @@ class SwiftGenPipeline:
         
         # Check if hybrid mode requested
         if provider.value == 'hybrid':
-            # Use hybrid generator
-            from generation.hybrid_generator import HybridGenerator
-            hybrid = HybridGenerator(self.llm_service)
+            # Use FAST hybrid generator for parallel execution
+            try:
+                from generation.fast_hybrid_generator import FastHybridGenerator
+                hybrid = FastHybridGenerator(self.llm_service)
+                print("[Pipeline] Using FAST HYBRID mode - parallel execution of all 3 LLMs")
+            except ImportError:
+                # Fallback to sequential hybrid if fast not available
+                from generation.hybrid_generator import HybridGenerator
+                hybrid = HybridGenerator(self.llm_service)
+                print("[Pipeline] Using HYBRID mode - leveraging all 3 LLMs (sequential)")
             
-            print("[Pipeline] Using HYBRID mode - leveraging all 3 LLMs")
             hybrid_result = await hybrid.generate_hybrid(
                 intent.raw_request,
                 intent.app_name,
@@ -324,6 +324,8 @@ class SwiftGenPipeline:
                         'content': content
                     })
                 print(f"[Pipeline] Hybrid generation used: {hybrid_result.components}")
+                if hasattr(hybrid_result, 'duration'):
+                    print(f"[Pipeline] Hybrid generation took {hybrid_result.duration:.1f}s")
                 return {
                     'files': files,
                     'app_name': intent.app_name

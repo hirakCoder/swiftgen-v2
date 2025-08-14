@@ -1,0 +1,248 @@
+{
+  "timestamp": "2025-08-14T15:52:27.502651",
+  "summary": {
+    "total_tests": 24,
+    "total_passed": 7,
+    "success_rate": 29.166666666666668
+  },
+  "providers": {
+    "claude": {
+      "passed": 1,
+      "total": 6,
+      "success_rate": 16.666666666666664,
+      "avg_duration": 32.325464963912964
+    },
+    "gpt4": {
+      "passed": 2,
+      "total": 6,
+      "success_rate": 33.33333333333333,
+      "avg_duration": 22.291605472564697
+    },
+    "grok": {
+      "passed": 3,
+      "total": 6,
+      "success_rate": 50.0,
+      "avg_duration": 27.548406839370728
+    },
+    "hybrid": {
+      "passed": 1,
+      "total": 6,
+      "success_rate": 16.666666666666664,
+      "avg_duration": 43.129616022109985
+    }
+  },
+  "details": [
+    {
+      "provider": "claude",
+      "results": [
+        {
+          "app_name": "SimpleTimer",
+          "complexity": "simple",
+          "success": false,
+          "duration": 29.076865196228027,
+          "error": "Failed to compile Swift files",
+          "project_id": "b3193354"
+        },
+        {
+          "app_name": "SimpleCounter",
+          "complexity": "simple",
+          "success": false,
+          "duration": 41.72059416770935,
+          "error": "Failed to compile Swift files",
+          "project_id": "beb343bc"
+        },
+        {
+          "app_name": "TodoList",
+          "complexity": "medium",
+          "success": true,
+          "duration": 32.325464963912964,
+          "error": null,
+          "project_id": "84628545"
+        },
+        {
+          "app_name": "Calculator",
+          "complexity": "medium",
+          "success": false,
+          "duration": 28.836613178253174,
+          "error": "Failed to compile Swift files",
+          "project_id": "f97215e2"
+        },
+        {
+          "app_name": "WeatherApp",
+          "complexity": "complex",
+          "success": false,
+          "duration": 42.31177496910095,
+          "error": "Failed to compile Swift files",
+          "project_id": "b2cb679c"
+        },
+        {
+          "app_name": "NotesApp",
+          "complexity": "complex",
+          "success": false,
+          "duration": 47.173064947128296,
+          "error": "Failed to compile Swift files",
+          "project_id": "b263883f"
+        }
+      ]
+    },
+    {
+      "provider": "gpt4",
+      "results": [
+        {
+          "app_name": "SimpleTimer",
+          "complexity": "simple",
+          "success": false,
+          "duration": 36.02650594711304,
+          "error": "Failed to compile Swift files",
+          "project_id": "12f50135"
+        },
+        {
+          "app_name": "SimpleCounter",
+          "complexity": "simple",
+          "success": true,
+          "duration": 16.49779987335205,
+          "error": null,
+          "project_id": "ac206b24"
+        },
+        {
+          "app_name": "TodoList",
+          "complexity": "medium",
+          "success": true,
+          "duration": 28.085411071777344,
+          "error": null,
+          "project_id": "2db666b7"
+        },
+        {
+          "app_name": "Calculator",
+          "complexity": "medium",
+          "success": false,
+          "duration": 51.97700500488281,
+          "error": "Failed to compile Swift files",
+          "project_id": "c8da2a56"
+        },
+        {
+          "app_name": "WeatherApp",
+          "complexity": "complex",
+          "success": false,
+          "duration": 44.63368201255798,
+          "error": "Failed to compile Swift files",
+          "project_id": "36ca8502"
+        },
+        {
+          "app_name": "NotesApp",
+          "complexity": "complex",
+          "success": false,
+          "duration": 45.53620195388794,
+          "error": "Failed to compile Swift files",
+          "project_id": "fc6ccd89"
+        }
+      ]
+    },
+    {
+      "provider": "grok",
+      "results": [
+        {
+          "app_name": "SimpleTimer",
+          "complexity": "simple",
+          "success": false,
+          "duration": 29.706287145614624,
+          "error": "Failed to compile Swift files",
+          "project_id": "922702a0"
+        },
+        {
+          "app_name": "SimpleCounter",
+          "complexity": "simple",
+          "success": true,
+          "duration": 20.482778787612915,
+          "error": null,
+          "project_id": "33d610f8"
+        },
+        {
+          "app_name": "TodoList",
+          "complexity": "medium",
+          "success": true,
+          "duration": 26.064656972885132,
+          "error": null,
+          "project_id": "2b2a3c75"
+        },
+        {
+          "app_name": "Calculator",
+          "complexity": "medium",
+          "success": false,
+          "duration": 53.72025990486145,
+          "error": "Failed to compile Swift files",
+          "project_id": "e80e3e55"
+        },
+        {
+          "app_name": "WeatherApp",
+          "complexity": "complex",
+          "success": false,
+          "duration": 41.63446497917175,
+          "error": "Failed to compile Swift files",
+          "project_id": "99b8b0de"
+        },
+        {
+          "app_name": "NotesApp",
+          "complexity": "complex",
+          "success": true,
+          "duration": 36.097784757614136,
+          "error": null,
+          "project_id": "d8ff5092"
+        }
+      ]
+    },
+    {
+      "provider": "hybrid",
+      "results": [
+        {
+          "app_name": "SimpleTimer",
+          "complexity": "simple",
+          "success": false,
+          "duration": 58.0083110332489,
+          "error": "Failed to generate code: Circuit breaker 'generation': Call timed out after 45s",
+          "project_id": "76319474"
+        },
+        {
+          "app_name": "SimpleCounter",
+          "complexity": "simple",
+          "success": true,
+          "duration": 43.129616022109985,
+          "error": null,
+          "project_id": "89678103"
+        },
+        {
+          "app_name": "TodoList",
+          "complexity": "medium",
+          "success": false,
+          "duration": 65.92648315429688,
+          "error": "Failed to generate code: Circuit breaker 'generation': Call timed out after 45s",
+          "project_id": "5d3e2ebb"
+        },
+        {
+          "app_name": "Calculator",
+          "complexity": "medium",
+          "success": false,
+          "duration": 90.94942903518677,
+          "error": "Failed to generate code: Circuit breaker 'generation': Call timed out after 45s",
+          "project_id": "cd6b577a"
+        },
+        {
+          "app_name": "WeatherApp",
+          "complexity": "complex",
+          "success": false,
+          "duration": 83.72738265991211,
+          "error": "Failed to generate code: Circuit breaker 'generation': Call timed out after 45s",
+          "project_id": "5258fee7"
+        },
+        {
+          "app_name": "NotesApp",
+          "complexity": "complex",
+          "success": false,
+          "duration": 113.84097099304199,
+          "error": "Failed to generate code: Circuit breaker 'generation': Call timed out after 45s",
+          "project_id": "bdaff520"
+        }
+      ]
+    }
+  ]
+}

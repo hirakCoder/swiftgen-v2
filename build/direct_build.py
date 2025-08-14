@@ -52,7 +52,43 @@ class DirectBuildSystem:
         # Step 4: Fix Swift code quality issues
         self._improve_code_quality(project_path)
         
-        # Step 4: Compile Swift files
+        # Step 4.5: Apply comprehensive fixes BEFORE compilation
+        try:
+            # Try comprehensive fixer first (includes all fixes)
+            from core.comprehensive_swift_fixer import ComprehensiveSwiftFixer
+            fixer = ComprehensiveSwiftFixer()
+            success, fixes = fixer.fix_project(project_path)
+            if fixes:
+                print(f"[DIRECT BUILD] Applied comprehensive fixes: {len(fixes)} issues resolved")
+        except ImportError:
+            # Fallback to individual fixers
+            try:
+                from core.advanced_parenthesis_balancer import AdvancedParenthesisBalancer
+                from core.mainactor_concurrency_fixer import MainActorConcurrencyFixer
+                
+                sources_dir = os.path.join(project_path, 'Sources')
+                fixes_applied = 0
+                
+                # Fix all Swift files
+                for root, dirs, files in os.walk(sources_dir):
+                    for f in files:
+                        if f.endswith('.swift'):
+                            file_path = os.path.join(root, f)
+                            
+                            # Apply parenthesis fixes
+                            if AdvancedParenthesisBalancer.balance_file(file_path):
+                                fixes_applied += 1
+                            
+                            # Apply MainActor fixes
+                            if MainActorConcurrencyFixer.fix_file(file_path):
+                                fixes_applied += 1
+                
+                if fixes_applied > 0:
+                    print(f"[DIRECT BUILD] Applied {fixes_applied} advanced fixes before compilation")
+            except Exception as e:
+                print(f"[DIRECT BUILD] Warning: Advanced fixers not available: {e}")
+        
+        # Step 5: Compile Swift files
         success = await self._compile_swift(project_path, app_bundle, app_name)
         
         if not success:
