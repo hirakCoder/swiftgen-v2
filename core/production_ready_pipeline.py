@@ -119,6 +119,13 @@ class ProductionReadyPipeline:
                 service.current_model = service.models.get("anthropic")
             elif provider == "gpt4":
                 service.current_model = service.models.get("openai")
+            elif provider == "hybrid":
+                # For hybrid, let the service use its intelligent routing
+                # Don't override current_model - let the router decide
+                pass
+            else:
+                # Default to grok for unknown providers
+                service.current_model = service.models.get("xai")
             
             result = await service.generate_ios_app(description, app_name)
             

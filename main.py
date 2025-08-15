@@ -671,14 +671,33 @@ async def generate_app(request: GenerateRequest):
         async def status_callback(status_data):
             await manager.send_message(project_id, status_data)
         
-        # Generate with production pipeline
-        result = await production_pipeline.generate_app(
-            description=request.request_text,
-            app_name=request.app_name,
-            project_id=project_id,
-            provider=request.provider or "grok",
-            status_callback=status_callback
-        )
+        # Generate with production pipeline (with timeout to prevent hanging)
+        try:
+            result = await asyncio.wait_for(
+                production_pipeline.generate_app(
+                    description=request.request_text,
+                    app_name=request.app_name,
+                    project_id=project_id,
+                    provider=request.provider or "grok",
+                    status_callback=status_callback
+                ),
+                timeout=60.0  # 60 second timeout for generation
+            )
+        except asyncio.TimeoutError:
+            print(f"[API] Generation timeout for project {project_id}")
+            await manager.send_message(project_id, {
+                'type': 'error',
+                'message': '⏱️ Generation timed out. Please try with a simpler request or different provider.',
+                'error': 'timeout'
+            })
+            return GenerateResponse(
+                success=False,
+                project_id=project_id,
+                message="Generation timed out after 60 seconds",
+                error="timeout",
+                fallback_action="try_simpler",
+                duration=60.0
+            )
         
         if result['success']:
             # Apply comprehensive fixes one more time
