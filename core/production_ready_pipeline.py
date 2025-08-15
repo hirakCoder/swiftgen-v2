@@ -45,20 +45,20 @@ class ProductionReadyPipeline:
         project_path = f"workspaces/{project_id}"
         
         # Strategy 1: Try LLM generation
-        await self._send_status(status_callback, "🚀 Starting intelligent app generation...")
+        await self._send_status(status_callback, "🚀 Starting intelligent app generation...", "analyze")
         
         llm_result = await self._try_llm_generation(
             description, app_name, project_id, provider, status_callback
         )
         
         if llm_result['success']:
-            await self._send_status(status_callback, "✅ LLM generation successful!")
+            await self._send_status(status_callback, "✅ LLM generation successful!", "generate")
             self.final_strategy = f"LLM ({provider})"
             return self._success_response(project_path, time.time() - start_time)
         
         # Strategy 2: Try different provider
         if provider != "grok":
-            await self._send_status(status_callback, "🔄 Trying alternative AI provider...")
+            await self._send_status(status_callback, "🔄 Trying alternative AI provider...", "generate")
             
             alt_provider = "grok" if provider != "grok" else "claude"
             llm_result = await self._try_llm_generation(
@@ -66,26 +66,32 @@ class ProductionReadyPipeline:
             )
             
             if llm_result['success']:
-                await self._send_status(status_callback, f"✅ Alternative provider ({alt_provider}) successful!")
+                await self._send_status(status_callback, f"✅ Alternative provider ({alt_provider}) successful!", "generate")
                 self.final_strategy = f"LLM ({alt_provider})"
                 return self._success_response(project_path, time.time() - start_time)
         
         # Strategy 3: Template fallback
-        await self._send_status(status_callback, "🎯 Using optimized template for guaranteed success...")
+        await self._send_status(status_callback, "🎯 Using optimized template for guaranteed success...", "generate")
         
-        # INTERNAL: Log template fallback (can be commented out for production)
-        await self._send_status(status_callback, "⚠️ [INTERNAL] LLM generation failed, falling back to template")
+        # INTERNAL: Log which providers failed
+        failed_providers = [provider]
+        if provider != "grok":
+            failed_providers.append("grok" if provider != "grok" else "claude")
+        
+        await self._send_status(
+            status_callback, 
+            f"⚠️ [INTERNAL] LLM generation failed with {', '.join(failed_providers)}. Using template fallback for quality assurance."
+        )
         
         template_result = await self._use_template_fallback(
             description, app_name, project_id, status_callback
         )
         
         if template_result['success']:
-            await self._send_status(status_callback, "✅ App generated from tested template!")
+            await self._send_status(status_callback, "✅ App generated from tested template!", "generate")
             # INTERNAL: Notify which template was used
-            app_type = TemplateFallbackSystem.detect_app_type(description)
-            await self._send_status(status_callback, f"📋 [INTERNAL] Used {app_type} template")
-            self.final_strategy = f"Template ({app_type})"
+            # Note: app_type will be set in _use_template_fallback
+            self.final_strategy = f"Template"
             return self._success_response(project_path, time.time() - start_time)
         
         # This should never happen, but just in case
@@ -137,7 +143,7 @@ class ProductionReadyPipeline:
             self._save_files(project_path, result['files'])
             
             # Apply comprehensive fixes
-            await self._send_status(status_callback, "🔧 Applying intelligent code fixes...")
+            await self._send_status(status_callback, "🔧 Applying intelligent code fixes...", "build")
             fixer = ComprehensiveSwiftFixer()
             fixer.fix_project(project_path)
             
@@ -166,16 +172,44 @@ class ProductionReadyPipeline:
             # Detect app type
             app_type = TemplateFallbackSystem.detect_app_type(description)
             
+            # Send internal message about which template is being used
+            await self._send_status(
+                status_callback, 
+                f"📋 [INTERNAL] Using {app_type} template - LLM failed after multiple attempts"
+            )
+            
             # Get template
             template = TemplateFallbackSystem.get_template(description, app_name)
             
             if not template:
                 # Default to counter app if type unknown
+                await self._send_status(
+                    status_callback, 
+                    f"⚠️ [INTERNAL] Unknown app type, defaulting to counter template"
+                )
                 template = TemplateFallbackSystem.get_template("counter", app_name)
+                app_type = "counter"
             
             # Save template files
             project_path = f"workspaces/{project_id}"
             self._save_files(project_path, template['files'])
+            
+            # Send internal quality warning
+            await self._send_status(
+                status_callback,
+                f"🔍 [INTERNAL] Template used - check code quality. App type: {app_type}"
+            )
+            
+            # Console log for internal monitoring
+            print(f"\n{'='*60}")
+            print(f"⚠️  TEMPLATE FALLBACK ACTIVATED")
+            print(f"App Type: {app_type}")
+            print(f"Reason: LLM generation failed after multiple attempts")
+            print(f"Quality Check: Template code is pre-tested but generic")
+            print(f"{'='*60}\n")
+            
+            # Update strategy with specific template type
+            self.final_strategy = f"Template ({app_type})"
             
             # Templates are pre-tested, should always compile
             return {'success': True}
@@ -287,11 +321,14 @@ struct ContentView_Previews: PreviewProvider {
             print(f"[Production Pipeline] Compilation test failed: {e}")
             return False
     
-    async def _send_status(self, callback, message: str):
-        """Send status update"""
+    async def _send_status(self, callback, message: str, stage: str = None):
+        """Send status update with stage information"""
         if callback:
             try:
-                await callback({'type': 'status', 'message': message})
+                data = {'type': 'status', 'message': message}
+                if stage:
+                    data['stage'] = stage
+                await callback(data)
             except:
                 pass
     

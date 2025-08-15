@@ -43,28 +43,38 @@ MODERN SWIFT PATTERNS (MANDATORY):
 CRITICAL SYNTAX RULES TO PREVENT COMPILATION ERRORS:
 1. ALWAYS import SwiftUI in every Swift file
 2. ALWAYS import Combine when using @Published, ObservableObject, or any Combine features
-3. NEVER use undefined types or properties
-4. ALWAYS define @State, @Published, and other property wrappers with explicit types
-5. Use @Environment(\\.dismiss) NOT @Environment(\\.presentationMode)
-6. ALWAYS use double quotes " for strings, NEVER single quotes '
-7. Every View must have a body property that returns some View
-8. NEVER leave empty implementations or undefined variables
-9. CRITICAL: EVERY opening delimiter MUST have a closing delimiter:
+3. ALWAYS include ALL necessary imports at the top of EVERY file:
+   - import Foundation - for Timer, Date, URL, Data, UserDefaults, JSONEncoder/Decoder
+   - import AVFoundation - for AudioServicesPlaySystemSound, AVAudioPlayer, AVPlayer
+   - import UIKit - for UIImpactFeedbackGenerator, UIDevice, UIApplication
+   - import CoreLocation - for CLLocationManager, CLLocation
+   - import MapKit - for MKMapView, MKAnnotation
+   - import PhotosUI - for PhotosPicker
+   - import StoreKit - for in-app purchases
+   - import CoreData - for persistent storage (avoid if possible)
+   - Never assume an import is automatic - be explicit!
+4. NEVER use undefined types or properties
+5. ALWAYS define @State, @Published, and other property wrappers with explicit types
+6. Use @Environment(\\.dismiss) NOT @Environment(\\.presentationMode)
+7. ALWAYS use double quotes " for strings, NEVER single quotes '
+8. Every View must have a body property that returns some View
+9. NEVER leave empty implementations or undefined variables
+10. CRITICAL: EVERY opening delimiter MUST have a closing delimiter:
    - Every ( must have a matching )
    - Every { must have a matching }
    - Every [ must have a matching ]
    - Count your delimiters! Multi-line modifiers like .overlay( MUST close with )
    - Example: .overlay(content) or .overlay(\n    content\n) <- Note the closing )
-10. For the main App file, ALWAYS use @main attribute
-11. NEVER use ... in class/struct/enum definitions - always provide complete implementation
-12. Color names: Use .gray (NOT .darkGray), .blue, .red, .green, .orange, .yellow, .pink, .purple
-13. NEVER create incomplete type definitions like "class Calculator..."
-14. ALWAYS complete all method implementations
-15. Use proper Swift 5+ syntax - no deprecated patterns
-16. **CRITICAL APP COMPLETENESS RULE**: If you reference ANY custom component (e.g., NewTimerView, CategoryPicker, CustomButton), you MUST create that component as a separate file
-17. **CRITICAL**: Never use a View/Component without creating its implementation file
-18. **CRITICAL**: Check every View usage and ensure the corresponding .swift file is included in your response
-16. RESERVED TYPES - CRITICAL - NEVER define these as your own types:
+11. For the main App file, ALWAYS use @main attribute
+12. NEVER use ... in class/struct/enum definitions - always provide complete implementation
+13. Color names: Use .gray (NOT .darkGray), .blue, .red, .green, .orange, .yellow, .pink, .purple
+14. NEVER create incomplete type definitions like "class Calculator..."
+15. ALWAYS complete all method implementations
+16. Use proper Swift 5+ syntax - no deprecated patterns
+17. **CRITICAL APP COMPLETENESS RULE**: If you reference ANY custom component (e.g., NewTimerView, CategoryPicker, CustomButton), you MUST create that component as a separate file
+18. **CRITICAL**: Never use a View/Component without creating its implementation file
+19. **CRITICAL**: Check every View usage and ensure the corresponding .swift file is included in your response
+20. RESERVED TYPES - CRITICAL - NEVER define these as your own types:
     a) Generic Types: Task, Result, Publisher, AsyncSequence, AsyncStream
        - These require generic parameters like Task<Success, Failure>
        - Use: TodoItem, AppResult, AppPublisher instead
@@ -351,7 +361,7 @@ Description: {description}
 
 Requirements:
 1. Create a fully functional SwiftUI app
-2. Include all necessary imports
+2. Include ALL necessary imports - check EVERY API/type you use and add its framework import
 3. Ensure all code compiles without errors
 4. Follow Apple's Human Interface Guidelines
 5. Make the UI beautiful and intuitive
@@ -368,9 +378,11 @@ Requirements:
 10. **CRITICAL**: Double-check that every custom View/Component has its own file
 
 CRITICAL FILE GENERATION RULES:
-1. If ContentView uses NoteRowView, you MUST include NoteRowView.swift in files array
-2. If any view references CustomButton(), you MUST include CustomButton.swift
-3. Every NavigationLink destination must have its view file included
+1. NEVER create the same filename in different directories (e.g., NO Sources/ContentView.swift AND Sources/Views/ContentView.swift)
+2. ContentView.swift MUST be at Sources/ContentView.swift ONLY (never in Sources/Views/)
+3. If ContentView uses NoteRowView, you MUST include NoteRowView.swift in files array
+4. If any view references CustomButton(), you MUST include CustomButton.swift
+5. Every NavigationLink destination must have its view file included
 4. Every .sheet content view must have its file included
 5. Count every custom component and ensure you have that many view files
 
@@ -383,7 +395,7 @@ Return JSON with this EXACT structure:
         }},
         {{
             "path": "Sources/ContentView.swift",
-            "content": "// Your complete ContentView implementation"
+            "content": "// Your complete ContentView implementation - ALWAYS put ContentView.swift directly in Sources/, NOT in Sources/Views/"
         }},
         {{
             "path": "Sources/Views/YourCustomView.swift",
@@ -402,12 +414,13 @@ IMPORTANT:
 - The App.swift content above is a template - keep the structure but you can enhance it
 - Create multiple files as needed: Views, Models, ViewModels, Services, etc.
 - All Swift code must be properly formatted and syntactically correct
-- Include all necessary imports at the top of each file
+- Include ALL necessary imports at the top of each file - VERIFY each type/API has its import!
 - For complex apps, use proper architecture:
+  - ContentView.swift ALWAYS goes directly in Sources/ (NOT in Views/)
   - Models in separate files (e.g., Sources/Models/User.swift)
   - ViewModels for business logic (e.g., Sources/ViewModels/UserViewModel.swift)
   - Services for API/Data (e.g., Sources/Services/APIService.swift)
-  - Views organized by feature (e.g., Sources/Views/Profile/ProfileView.swift)
+  - Other views (NOT ContentView) organized by feature (e.g., Sources/Views/Profile/ProfileView.swift)
 
 CRITICAL VALIDATION RULES:
 - Every type/view you reference MUST be defined in your files
@@ -538,8 +551,13 @@ When modifying an iOS app:
    - Any form of truncation or abbreviation
 
 4. **FULL FILE CONTENT**: For unchanged files, return their COMPLETE original content
-5. **VERIFY COMPLETENESS**: Before responding, verify each file:
-   - Has all imports
+5. **VERIFY COMPLETENESS**: Before responding, verify EACH file:
+   - Has ALL necessary imports (check EVERY type/API used!)
+     * Timer needs: import Foundation
+     * AudioServicesPlaySystemSound needs: import AVFoundation
+     * UIImpactFeedbackGenerator needs: import UIKit
+     * Any View/State/ObservableObject needs: import SwiftUI
+     * @Published/ObservableObject needs: import Combine
    - Has balanced braces
    - Contains full implementations
    - No placeholder text

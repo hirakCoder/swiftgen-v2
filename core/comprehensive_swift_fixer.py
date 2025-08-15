@@ -29,6 +29,9 @@ class ComprehensiveSwiftFixer:
         if not os.path.exists(sources_dir):
             return False, ["Sources directory not found"]
         
+        # First, fix duplicate files
+        self._fix_duplicate_files(sources_dir)
+        
         # Process all Swift files
         for root, dirs, files in os.walk(sources_dir):
             for file in files:
@@ -38,6 +41,39 @@ class ComprehensiveSwiftFixer:
         
         return True, self.fixes_applied
     
+    def _fix_duplicate_files(self, sources_dir: str) -> None:
+        """Remove duplicate files, keeping the one at the root level"""
+        seen_files = {}
+        
+        # Walk through all files and track duplicates
+        for root, dirs, files in os.walk(sources_dir):
+            for file in files:
+                if file.endswith('.swift'):
+                    file_path = os.path.join(root, file)
+                    
+                    # Track files by their basename
+                    if file not in seen_files:
+                        seen_files[file] = [file_path]
+                    else:
+                        seen_files[file].append(file_path)
+        
+        # Remove duplicates, preferring files at the root of Sources/
+        for filename, paths in seen_files.items():
+            if len(paths) > 1:
+                # Special case for ContentView.swift - keep the one in Sources/
+                if filename == 'ContentView.swift':
+                    root_path = os.path.join(sources_dir, 'ContentView.swift')
+                    for path in paths:
+                        if path != root_path and os.path.exists(path):
+                            os.remove(path)
+                            self.fixes_applied.append(f"Removed duplicate {filename} from {path}")
+                else:
+                    # For other files, keep the first one
+                    for path in paths[1:]:
+                        if os.path.exists(path):
+                            os.remove(path)
+                            self.fixes_applied.append(f"Removed duplicate {filename} from {path}")
+    
     def _fix_file(self, file_path: str) -> None:
         """Apply all fixes to a single file"""
         with open(file_path, 'r') as f:
@@ -46,6 +82,7 @@ class ComprehensiveSwiftFixer:
         original_content = content
         
         # Apply fixes in order of importance
+        content = self._fix_unclosed_function_calls(content, file_path)
         content = self._fix_parentheses_and_braces(content, file_path)
         content = self._fix_button_syntax(content, file_path)
         content = self._fix_timer_concurrency(content, file_path)
@@ -62,13 +99,75 @@ class ComprehensiveSwiftFixer:
             with open(file_path, 'w') as f:
                 f.write(content)
     
+    def _fix_unclosed_function_calls(self, content: str, file_path: str) -> str:
+        """Fix unclosed function calls and parameter lists"""
+        lines = content.split('\n')
+        fixed_lines = []
+        open_parens = 0
+        function_start = -1
+        
+        for i, line in enumerate(lines):
+            # Count parentheses
+            line_open = line.count('(')
+            line_close = line.count(')')
+            prev_open = open_parens
+            open_parens += line_open - line_close
+            
+            # Detect function call start (something like ViewName( )
+            if re.search(r'\w+View\s*\(', line) and line_open > line_close:
+                function_start = i
+            
+            # If we have unclosed parens and see a new statement starting
+            if open_parens > 0 and function_start >= 0:
+                # Check if next line starts a new statement
+                if i + 1 < len(lines):
+                    next_line = lines[i + 1]
+                    # Common patterns that indicate a new statement
+                    if (next_line.strip() == '' or 
+                        re.match(r'^\s*(TimerPresetPicker|NavigationLink|Button|Text|VStack|HStack|Spacer|\})', next_line)):
+                        # We need to close the parentheses
+                        if not line.rstrip().endswith(')'):
+                            line = line.rstrip() + ')'
+                            open_parens -= 1
+                            self.fixes_applied.append(f"Added missing ) to line {i+1} in {os.path.basename(file_path)}")
+                            function_start = -1
+            
+            fixed_lines.append(line)
+        
+        # Final check: if we still have unclosed parens at the end
+        if open_parens > 0:
+            # Add closing parens to the last non-empty line
+            for i in range(len(fixed_lines) - 1, -1, -1):
+                if fixed_lines[i].strip():
+                    fixed_lines[i] = fixed_lines[i].rstrip() + ')' * open_parens
+                    self.fixes_applied.append(f"Added {open_parens} missing ) at end of file in {os.path.basename(file_path)}")
+                    break
+        
+        return '\n'.join(fixed_lines)
+    
     def _fix_parentheses_and_braces(self, content: str, file_path: str) -> str:
         """Fix all parenthesis and brace issues"""
         lines = content.split('\n')
         fixed_lines = []
-        paren_stack = []
-        brace_stack = []
         
+        # First pass: Fix Preview block with extra parentheses
+        for i, line in enumerate(lines):
+            # Fix })) pattern (common in Preview blocks)
+            if line.strip() == '}))':
+                # Check if this is part of a Preview block
+                if i > 0 and any('#Preview' in lines[j] for j in range(max(0, i-5), i)):
+                    line = '}'
+                    self.fixes_applied.append(f"Fixed extra )) in Preview block at line {i+1} in {os.path.basename(file_path)}")
+            elif line.strip().endswith('}))'):
+                # Fix trailing }))
+                line = line.replace('})))', '})')
+                self.fixes_applied.append(f"Fixed trailing }}))) at line {i+1} in {os.path.basename(file_path)}")
+            fixed_lines.append(line)
+        
+        lines = fixed_lines
+        fixed_lines = []
+        
+        # Second pass: Fix other specific patterns
         for i, line in enumerate(lines):
             # Fix Button(action:){ pattern
             if 'Button(action:){' in line:
@@ -92,7 +191,51 @@ class ComprehensiveSwiftFixer:
             
             fixed_lines.append(line)
         
-        return '\n'.join(fixed_lines)
+        # Second pass: Balance braces
+        content = '\n'.join(fixed_lines)
+        
+        # Count braces
+        open_braces = content.count('{')
+        close_braces = content.count('}')
+        
+        # Remove extra closing braces at the end
+        if close_braces > open_braces:
+            extra = close_braces - open_braces
+            # Remove extra } from the end, working backwards
+            lines = content.split('\n')
+            removed = 0
+            
+            for i in range(len(lines) - 1, -1, -1):
+                if removed >= extra:
+                    break
+                    
+                line = lines[i]
+                braces_in_line = line.count('}')
+                
+                if braces_in_line > 0:
+                    # Count how many to remove from this line
+                    to_remove = min(braces_in_line, extra - removed)
+                    
+                    # Remove the braces from the end of the line
+                    for _ in range(to_remove):
+                        # Find the last } and remove it
+                        last_brace_idx = line.rfind('}')
+                        if last_brace_idx != -1:
+                            line = line[:last_brace_idx] + line[last_brace_idx+1:]
+                            removed += 1
+                    
+                    lines[i] = line
+                    self.fixes_applied.append(f"Removed {to_remove} extra closing brace(s) from line {i+1} in {os.path.basename(file_path)}")
+            
+            content = '\n'.join(lines)
+        
+        # Add missing closing braces at the end
+        elif open_braces > close_braces:
+            missing = open_braces - close_braces
+            content += '\n' + '}\n' * missing
+            self.fixes_applied.append(f"Added {missing} missing closing braces to {os.path.basename(file_path)}")
+        
+        return content
     
     def _fix_button_syntax(self, content: str, file_path: str) -> str:
         """Fix Button-specific syntax issues"""
@@ -222,6 +365,8 @@ class ComprehensiveSwiftFixer:
             imports_needed.add('import UIKit')
         if 'URLSession' in content:
             imports_needed.add('import Foundation')
+        if any(x in content for x in ['AudioServicesPlaySystemSound', 'AVAudioPlayer', 'AVPlayer']):
+            imports_needed.add('import AVFoundation')
         if any(x in content for x in ['@State', '@StateObject', 'View', 'NavigationStack']):
             imports_needed.add('import SwiftUI')
         
@@ -280,11 +425,11 @@ class ComprehensiveSwiftFixer:
     
     def _fix_observable_syntax(self, content: str, file_path: str) -> str:
         """Fix @Observable vs ObservableObject syntax"""
-        # iOS 16 uses ObservableObject, not @Observable
+        lines = content.split('\n')
+        fixed_lines = []
+        
+        # First pass: handle @Observable
         if '@Observable' in content:
-            lines = content.split('\n')
-            fixed_lines = []
-            
             for line in lines:
                 if '@Observable' in line:
                     # Skip this line, will be replaced with proper syntax
@@ -294,12 +439,29 @@ class ComprehensiveSwiftFixer:
                     if ': ObservableObject' not in line:
                         line = re.sub(r'class\s+(\w+)', r'class \1: ObservableObject', line)
                         self.fixes_applied.append(f"Fixed Observable to ObservableObject in {os.path.basename(file_path)}")
-                
                 fixed_lines.append(line)
-            
-            content = '\n'.join(fixed_lines)
+            lines = fixed_lines
         
-        return content
+        # Second pass: Fix classes that should be ObservableObject
+        # Look for classes that end with Service, ViewModel, Model, Store, Manager
+        fixed_lines = []
+        for i, line in enumerate(lines):
+            if re.match(r'^class\s+\w+(Service|ViewModel|Model|Store|Manager)', line):
+                if ': ObservableObject' not in line and 'protocol' not in line:
+                    # Check if it already has inheritance
+                    if ':' in line:
+                        # Add ObservableObject to existing inheritance
+                        line = re.sub(r':', ': ObservableObject, ', line, count=1)
+                    else:
+                        # Add ObservableObject
+                        if '{' in line:
+                            line = line.replace('{', ': ObservableObject {')
+                        else:
+                            line = re.sub(r'class\s+(\w+)', r'class \1: ObservableObject', line)
+                    self.fixes_applied.append(f"Added ObservableObject conformance in {os.path.basename(file_path)}")
+            fixed_lines.append(line)
+        
+        return '\n'.join(fixed_lines)
     
     def _fix_calculator_syntax(self, content: str, file_path: str) -> str:
         """Fix calculator-specific syntax issues"""

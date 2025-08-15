@@ -643,14 +643,42 @@
         // Handle WebSocket Messages
         function handleWebSocketMessage(data) {
             if (data.type === 'status') {
-                const message = data.message.toLowerCase();
+                const message = data.message;
+                const messageLower = message.toLowerCase();
                 const stage = data.stage;
+                
+                // Check if this is an internal message
+                if (message.includes('[INTERNAL]')) {
+                    console.log('📋 INTERNAL MESSAGE:', message);
+                    // Optionally show in UI for debugging
+                    if (window.debugMode) {
+                        addMessage('system', `🔍 ${message}`);
+                    }
+                }
                 
                 // Check if this is a modification by looking for reload stage
                 const isModification = document.querySelector('[data-stage="reload"]') !== null;
                 
                 // Update progress based on stage
                 console.log(`[WebSocket] Processing stage: ${stage}, isModification: ${isModification}`);
+                
+                // Add status messages to chat for key stages (excluding internal messages)
+                if (!message.includes('[INTERNAL]')) {
+                    if (stage === 'analyze' || stage === 'generate' || stage === 'build' || stage === 'deploy') {
+                        // Create a status message element with smaller, dimmed text
+                        const statusDiv = document.createElement('div');
+                        statusDiv.className = 'status-message';
+                        statusDiv.style.cssText = 'font-size: 0.85em; color: #888; margin: 5px 0; font-style: italic;';
+                        statusDiv.innerHTML = `<span>📡 ${message}</span>`;
+                        
+                        // Add to chat
+                        const chatMessages = document.getElementById('chatMessages');
+                        if (chatMessages) {
+                            chatMessages.appendChild(statusDiv);
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }
+                    }
+                }
                 
                 if (stage === 'analyze') {
                     updateProgress('analyze', 'active', 'Analyzing requirements...');
@@ -686,16 +714,34 @@
                 }
                 
                 // Check message content for specific updates
-                if (message.includes('simulator')) {
-                    if (message.includes('booting')) {
+                if (messageLower.includes('simulator')) {
+                    if (messageLower.includes('booting')) {
                         updateProgress('deploy', 'active', 'Booting simulator...');
-                    } else if (message.includes('installing')) {
+                    } else if (messageLower.includes('installing')) {
                         updateProgress('deploy', 'active', 'Installing app...');
-                    } else if (message.includes('launched')) {
+                    } else if (messageLower.includes('launched')) {
                         updateProgress('launch', 'completed');
                         // Don't focus - let user see the progress completion
                         completeProgress(true);
                         console.log('[UI] App launched - progress complete, user can view simulator when ready');
+                    }
+                }
+                
+                // Add other important status messages to chat (without stage)
+                if (!stage && !message.includes('[INTERNAL]')) {
+                    // Show messages about LLM providers, fixes being applied, etc.
+                    if (messageLower.includes('trying') || messageLower.includes('applying') || 
+                        messageLower.includes('using') || messageLower.includes('successful')) {
+                        const statusDiv = document.createElement('div');
+                        statusDiv.className = 'status-message';
+                        statusDiv.style.cssText = 'font-size: 0.85em; color: #888; margin: 5px 0; font-style: italic;';
+                        statusDiv.innerHTML = `<span>📡 ${message}</span>`;
+                        
+                        const chatMessages = document.getElementById('chatMessages');
+                        if (chatMessages) {
+                            chatMessages.appendChild(statusDiv);
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }
                     }
                 }
                 
@@ -935,6 +981,18 @@
                     await new Promise(resolve => setTimeout(resolve, 200));
                 }
                 
+                // For creation requests, ensure we have creation keywords
+                let finalDescription = message;
+                if (!isModification) {
+                    // Check if message already has creation keywords
+                    const hasCreationKeyword = /\b(create|build|make|develop|design)\b/i.test(message);
+                    if (!hasCreationKeyword) {
+                        // Add "Create a" prefix to ensure backend recognizes it as creation
+                        finalDescription = `Create a ${message.toLowerCase()}`;
+                        console.log('[FRONTEND FIX] Added creation keyword:', finalDescription);
+                    }
+                }
+                
                 // Send request with project_id for WebSocket sync
                 const requestBody = isModification ? {
                     project_id: currentProjectId,
@@ -942,7 +1000,7 @@
                     app_name: appName,
                     provider: selectedProvider
                 } : {
-                    description: message,  // Send the original message as-is
+                    description: finalDescription,  // Use the enhanced description for creation
                     app_name: appName,
                     project_id: currentProjectId,  // Need this for WebSocket sync
                     provider: selectedProvider
@@ -988,6 +1046,12 @@
                         const appName = extractAppName(message);
                         responseMessage = generateIntelligentResponse(message, appName, result);
                     }
+                    // Check if template was used (from backend message)
+                    if (result.message && result.message.includes('Template')) {
+                        responseMessage += '\n\n⚠️ **Note**: This app was generated from a pre-tested template for guaranteed success.';
+                        console.log('[TEMPLATE] Template fallback was used');
+                    }
+                    
                     console.log('[RESPONSE] Final message to display:', responseMessage);
                     addMessage('assistant', responseMessage);
                     // Add to message history
