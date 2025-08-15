@@ -691,22 +691,41 @@ async def generate_app(request: GenerateRequest):
                 project_id
             )
             
-            # Send success with strategy info
-            strategy_msg = result.get("strategy", "optimized pipeline")
-            await manager.send_message(project_id, {
-                'type': 'success',
-                'message': f'✅ App generated successfully!',
-                'app_path': result['project_path'],
-                'strategy': strategy_msg  # Include strategy for internal tracking
-            })
-            
-            return GenerateResponse(
-                success=True,
-                project_id=project_id,
-                message=f"App generated successfully using {strategy_msg}",
-                app_path=f"{result['project_path']}/build/{request.app_name}.app",
-                duration=result['duration']
-            )
+            # Check if build actually succeeded
+            if build_result.get('success'):
+                # Send success with strategy info
+                strategy_msg = result.get("strategy", "optimized pipeline")
+                await manager.send_message(project_id, {
+                    'type': 'success',
+                    'message': f'✅ App generated and launched successfully!',
+                    'app_path': result['project_path'],
+                    'strategy': strategy_msg  # Include strategy for internal tracking
+                })
+                
+                return GenerateResponse(
+                    success=True,
+                    project_id=project_id,
+                    message=f"App generated successfully using {strategy_msg}",
+                    app_path=f"{result['project_path']}/build/{request.app_name}.app",
+                    duration=result['duration']
+                )
+            else:
+                # Build failed - return error
+                error_msg = build_result.get('error', 'Failed to build and launch app')
+                await manager.send_message(project_id, {
+                    'type': 'error',
+                    'message': f'❌ Build failed: {error_msg}',
+                    'error': error_msg
+                })
+                
+                return GenerateResponse(
+                    success=False,
+                    project_id=project_id,
+                    message="App generation succeeded but build failed",
+                    error=error_msg,
+                    fallback_action="check_syntax",
+                    duration=time.time() - start_time
+                )
         else:
             # This should rarely happen with production pipeline
             raise Exception("Production pipeline failed unexpectedly")

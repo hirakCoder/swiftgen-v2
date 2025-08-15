@@ -788,34 +788,43 @@
         }
 
         async handleSubmit() {
-            const input = this.chatInput.value.trim();
-            if (!input || this.isGenerating) return;
+            try {
+                const input = this.chatInput.value.trim();
+                console.log('[FLOW] handleSubmit called with input:', input);
+                if (!input || this.isGenerating) {
+                    console.log('[FLOW] Returning early - empty input or already generating');
+                    return;
+                }
 
-            // Add user message
-            this.addMessage('user', input);
+                // Add user message
+                this.addMessage('user', input);
 
-            // Clear input
-            this.chatInput.value = '';
-            this.chatInput.style.height = 'auto';
+                // Clear input
+                this.chatInput.value = '';
+                this.chatInput.style.height = 'auto';
 
-            // If there's an active project, treat EVERYTHING as modification request
-            // unless it's a clear command
-            const isCommand = this.isCommand(input);
-            
-            if (isCommand) {
-                // Handle commands
-                this.handleCommand(input);
-                return;
-            }
-            
-            // Add typing indicator immediately for ALL requests
-            this.addTypingIndicator();
+                // If there's an active project, treat EVERYTHING as modification request
+                // unless it's a clear command
+                const isCommand = this.isCommand(input);
+                console.log('[FLOW] isCommand result:', isCommand);
+                
+                if (isCommand) {
+                    console.log('[FLOW] Handling as command');
+                    // Handle commands
+                    this.handleCommand(input);
+                    return;
+                }
+                
+                console.log('[FLOW] Not a command, proceeding with API call');
+                // Add typing indicator immediately for ALL requests
+                this.addTypingIndicator();
             
             // Flag to track if request was handled
             let requestHandled = false;
             
             // Use the appropriate endpoint based on whether we have a project
             try {
+                console.log('[FLOW] Entering try block for API call');
                 const endpoint = this.currentProjectId ? '/api/modify' : '/api/generate';
                 const payload = this.currentProjectId ? {
                     project_id: this.currentProjectId,
@@ -904,6 +913,11 @@
 
             // IMPORTANT: Since we've handled the request above, always return here
             return;
+            } catch (globalError) {
+                console.error('[CRITICAL ERROR] Uncaught error in handleSubmit:', globalError);
+                console.error('Stack trace:', globalError.stack);
+                alert('Critical error: ' + globalError.message + ' - Check console for details');
+            }
             
             if (this.currentProjectId) {
                 // Skip question detection - treat as modification

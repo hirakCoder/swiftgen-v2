@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Minimal Test - Same Structure as Index</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .chat-input { width: 100%; padding: 10px; margin: 10px 0; }
+        .button { padding: 10px 20px; background: #007AFF; color: white; border: none; cursor: pointer; }
+        .messages { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; margin-bottom: 10px; }
+        .message { margin: 5px 0; padding: 5px; }
+        .user { background: #e3f2fd; }
+        .assistant { background: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <h1>Minimal Test - Matching Index.html Structure</h1>
+    
+    <div id="chatMessages" class="messages"></div>
+    
+    <form id="chatForm">
+        <input type="text" id="chatInput" class="chat-input" placeholder="Describe your app..." value="Create a simple timer app">
+        <button type="submit" id="sendBtn" class="button">Send</button>
+    </form>
+    
+    <div id="status"></div>
+    
+    <script>
+    class MinimalApp {
+        constructor() {
+            console.log('MinimalApp constructor');
+            this.currentProjectId = null;
+            this.isGenerating = false;
+            this.initializeElements();
+            this.setupEventListeners();
+        }
+        
+        initializeElements() {
+            console.log('Initializing elements');
+            this.chatMessages = document.getElementById('chatMessages');
+            this.chatInput = document.getElementById('chatInput');
+            this.chatForm = document.getElementById('chatForm');
+            this.sendBtn = document.getElementById('sendBtn');
+        }
+        
+        setupEventListeners() {
+            console.log('Setting up event listeners');
+            this.chatForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                console.log('Form submitted');
+                this.handleSubmit();
+            });
+        }
+        
+        async handleSubmit() {
+            const input = this.chatInput.value.trim();
+            console.log('handleSubmit called with:', input);
+            
+            if (!input || this.isGenerating) {
+                console.log('Returning early');
+                return;
+            }
+            
+            // Add user message
+            this.addMessage('user', input);
+            
+            // Clear input
+            this.chatInput.value = '';
+            
+            // Make API call
+            console.log('Making API call...');
+            try {
+                const endpoint = '/api/generate';
+                const payload = {
+                    description: input,
+                    app_name: `App_${Date.now()}`,
+                    provider: 'grok'
+                };
+                
+                console.log('Calling fetch with:', endpoint, payload);
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                console.log('Response received:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (data.success) {
+                    this.currentProjectId = data.project_id;
+                    this.addMessage('assistant', `Success! Generated app with project ID: ${data.project_id}`);
+                } else {
+                    this.addMessage('assistant', `Error: ${data.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                this.addMessage('assistant', `Error: ${error.message}`);
+            }
+        }
+        
+        addMessage(type, text) {
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            div.textContent = `${type}: ${text}`;
+            this.chatMessages.appendChild(div);
+            this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        }
+    }
+    
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM loaded, creating MinimalApp');
+        new MinimalApp();
+    });
+    </script>
+</body>
+</html>

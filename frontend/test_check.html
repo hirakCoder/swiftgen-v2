@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Check</title>
+</head>
+<body>
+    <h1>Testing isCommand function</h1>
+    <script>
+        function isCommand(input) {
+            const commandPatterns = [
+                /^(show|display|list|check|test|run|debug|clear|reset|stop|cancel)/i,
+                /^\/\w+/  // Slash commands
+            ];
+            return commandPatterns.some(pattern => pattern.test(input));
+        }
+        
+        const testInputs = [
+            "Simple timer app",
+            "Create a timer app",
+            "show status",
+            "/help",
+            "Make a counter app"
+        ];
+        
+        testInputs.forEach(input => {
+            console.log(`"${input}" -> isCommand: ${isCommand(input)}`);
+            document.write(`<p>"${input}" -> isCommand: ${isCommand(input)}</p>`);
+        });
+    </script>
+</body>
+</html>
