@@ -814,27 +814,6 @@
             // Flag to track if request was handled
             let requestHandled = false;
             
-            // Pre-generate project_id for generation requests
-            let preGeneratedProjectId = null;
-            if (this.looksLikeGeneration(input) && !this.currentProjectId) {
-                preGeneratedProjectId = `proj_${Math.random().toString(36).substr(2, 8)}`;
-                // console.log('[UI] Pre-generating project ID:', preGeneratedProjectId);
-                
-                // Connect WebSocket BEFORE API call
-                this.setupWebSocket(preGeneratedProjectId);
-                
-                // Wait for WebSocket connection to establish
-                await new Promise(resolve => setTimeout(resolve, 150));
-                // console.log('[UI] WebSocket pre-connected for generation');
-            }
-            
-            // CRITICAL FIX: Also ensure WebSocket is connected for modifications
-            if (this.currentProjectId && (!this.ws || this.ws.readyState !== WebSocket.OPEN)) {
-                console.log('[UI] Reconnecting WebSocket for modification');
-                this.setupWebSocket(this.currentProjectId);
-                await new Promise(resolve => setTimeout(resolve, 150));
-            }
-            
             // Use the appropriate endpoint based on whether we have a project
             try {
                 const endpoint = this.currentProjectId ? '/api/modify' : '/api/generate';
@@ -848,6 +827,9 @@
                     provider: 'grok'
                 };
                 
+                console.log('[DEBUG] Sending request to:', endpoint);
+                console.log('[DEBUG] Payload:', payload);
+                
                 const chatResponse = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
@@ -856,8 +838,11 @@
                     body: JSON.stringify(payload)
                 });
 
+                console.log('[DEBUG] Response status:', chatResponse.status);
+                
                 if (chatResponse.ok) {
                     const chatResult = await chatResponse.json();
+                    console.log('[DEBUG] Response data:', chatResult);
                     
                     // Handle successful response
                     if (chatResult.success) {

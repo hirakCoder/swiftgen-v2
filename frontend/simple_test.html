@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Test</title>
+</head>
+<body>
+    <h1>Simple API Test</h1>
+    <input type="text" id="description" placeholder="Enter app description" value="Create a simple timer app">
+    <button onclick="testAPI()">Test Generate</button>
+    <div id="status"></div>
+    <pre id="result"></pre>
+    
+    <script>
+        async function testAPI() {
+            const description = document.getElementById('description').value;
+            const statusDiv = document.getElementById('status');
+            const resultDiv = document.getElementById('result');
+            
+            statusDiv.textContent = 'Sending request...';
+            
+            try {
+                console.log('Sending request to /api/generate');
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        description: description,
+                        app_name: `TestApp_${Date.now()}`,
+                        provider: 'grok'
+                    })
+                });
+                
+                console.log('Response received:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (data.success) {
+                    statusDiv.textContent = '✅ Success!';
+                    statusDiv.style.color = 'green';
+                } else {
+                    statusDiv.textContent = '❌ Failed';
+                    statusDiv.style.color = 'red';
+                }
+                
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.textContent = '❌ Error: ' + error.message;
+                statusDiv.style.color = 'red';
+            }
+        }
+    </script>
+</body>
+</html>

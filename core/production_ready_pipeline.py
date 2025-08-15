@@ -11,6 +11,7 @@ from typing import Dict, Optional, Tuple, List
 from pathlib import Path
 import shutil
 import time
+from core.template_fallback_system import TemplateFallbackSystem
 
 class ProductionReadyPipeline:
     """
@@ -154,8 +155,6 @@ class ProductionReadyPipeline:
         """Use template fallback for guaranteed success"""
         
         try:
-            from core.template_fallback_system import TemplateFallbackSystem
-            
             # Detect app type
             app_type = TemplateFallbackSystem.detect_app_type(description)
             
