@@ -835,155 +835,90 @@
                 await new Promise(resolve => setTimeout(resolve, 150));
             }
             
-            // Try the chat endpoint first for intelligent routing
+            // Use the appropriate endpoint based on whether we have a project
             try {
-                const chatResponse = await fetch('/api/chat', {
+                const endpoint = this.currentProjectId ? '/api/modify' : '/api/generate';
+                const payload = this.currentProjectId ? {
+                    project_id: this.currentProjectId,
+                    description: input,
+                    provider: 'grok'
+                } : {
+                    description: input,
+                    app_name: `App_${Date.now()}`,
+                    provider: 'grok'
+                };
+                
+                const chatResponse = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        message: input,
-                        project_id: this.currentProjectId || preGeneratedProjectId,
-                        context: {
-                            just_generated: this.lastAction === 'generated',
-                            last_action: this.lastAction
-                        }
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 if (chatResponse.ok) {
                     const chatResult = await chatResponse.json();
                     
-                    // Check if it was handled as a chat
-                    if (chatResult.type === 'chat') {
+                    // Handle successful response
+                    if (chatResult.success) {
                         this.removeTypingIndicator();
-                        this.addMessage('assistant', chatResult.response);
+                        
+                        // Set the project ID
+                        if (chatResult.project_id) {
+                            this.currentProjectId = chatResult.project_id;
+                            
+                            // Ensure WebSocket is connected
+                            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+                                this.setupWebSocket(chatResult.project_id);
+                            }
+                        }
+                        
+                        // Determine if this is a modification or generation
+                        const isModification = endpoint === '/api/modify';
+                        
+                        // Show success message based on the actual API response
+                        if (isModification) {
+                            this.lastAction = 'modified';
+                            this.addMessage('assistant', `✅ Successfully modified your app!\n\n${chatResult.message || 'Modification complete'}`);
+                        } else {
+                            this.lastAction = 'generated';
+                            const appName = payload.app_name || 'your app';
+                            this.addMessage('assistant', `🎉 Successfully generated ${appName}!\n\n${chatResult.message || 'App generated successfully'}\n\nThe app is now building and will launch in the simulator...`);
+                        }
+                        
+                        // Update UI state to show completion
+                        this.isGenerating = false;
+                        this.sendBtn.disabled = false;
+                        this.sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+                        
+                        // Show completion in status panel if visible
+                        const progressText = document.getElementById('progressText');
+                        if (progressText) {
+                            progressText.textContent = 'Complete! App launched in simulator.';
+                        }
+                        
                         requestHandled = true;
                         return;
-                    }
-                    
-                    // If it's a technical response with immediate acknowledgment
-                    if (chatResult.type === 'technical' && chatResult.response) {
-                        // Remove typing indicator and show immediate acknowledgment
-                        this.removeTypingIndicator();
-                        this.addMessage('assistant', chatResult.response);
-                        
-                        // If it's a modification, we already have the project_id
-                        if (chatResult.action === 'modify' && chatResult.project_id) {
-                            this.currentProjectId = chatResult.project_id;
-                            
-                            // CRITICAL FIX: Ensure WebSocket is connected for modifications
-                            // console.log('[UI] Ensuring WebSocket connection for modification:', chatResult.project_id);
-                            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-                                // console.log('[UI] WebSocket not connected, setting up now...');
-                                this.setupWebSocket(chatResult.project_id);
-                            } else {
-                                // console.log('[UI] WebSocket already connected');
-                            }
-                            
-                            // The modification is happening in background
-                            // Show status panel for progress tracking
-                            this.statusPanel.classList.remove('hidden');
-                            this.resetStatusStages();
-                            
-                            // Update progress title for modification
-                            const progressTitle = document.getElementById('progressTitle');
-                            if (progressTitle) {
-                                progressTitle.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Modification Progress';
-                            }
-                            
-                            // Show initial status
-                            const progressText = document.getElementById('progressText');
-                            if (progressText) {
-                                progressText.textContent = 'Preparing modifications...';
-                            }
-                            
-                            // Update UI state
-                            this.isGenerating = true;
-                            this.sendBtn.disabled = true;
-                            this.sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                            
-                            // Start timer for modification
-                            this.startGenerationTimer();
-                            
-                            // WebSocket will send updates
-                            requestHandled = true;
-                            return;
-                        }
-                        
-                        // If it's generation with immediate response
-                        if (chatResult.action === 'generate' && chatResult.project_id) {
-                            // Set up the project ID
-                            this.currentProjectId = chatResult.project_id;
-                            
-                            // WebSocket should already be connected if we pre-generated
-                            if (preGeneratedProjectId && preGeneratedProjectId === chatResult.project_id) {
-                                // console.log('[UI] WebSocket already pre-connected for project:', chatResult.project_id);
-                            } else {
-                                // Fallback: Setup WebSocket if not pre-connected
-                                // console.log('[UI] Setting up WebSocket for project:', chatResult.project_id);
-                                this.setupWebSocket(chatResult.project_id);
-                            }
-                            
-                            // Show status panel and start tracking
-                            this.statusPanel.classList.remove('hidden');
-                            this.resetStatusStages();
-                            
-                            // Show initial status immediately
-                            const progressText = document.getElementById('progressText');
-                            if (progressText) {
-                                progressText.textContent = 'Connecting to generation service...';
-                                console.log('[UI] Set initial progress text to:', progressText.textContent);
-                                
-                                // Force DOM update
-                                progressText.style.display = 'none';
-                                progressText.offsetHeight; // Trigger reflow
-                                progressText.style.display = '';
-                            }
-                            
-                            // Update UI state
-                            this.isGenerating = true;
-                            this.sendBtn.disabled = true;
-                            this.sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                            
-                            // Start timer
-                            this.startGenerationTimer();
-                            
-                            // Update progress title
-                            const progressTitle = document.getElementById('progressTitle');
-                            if (progressTitle) {
-                                progressTitle.innerHTML = '<i class="fas fa-tasks mr-2"></i>Generation Progress';
-                            }
-                            
-                            // IMPORTANT: Return here to prevent duplicate API call
-                            requestHandled = true;
-                            return;
-                        }
-                    }
-                    
-                    // If it's a technical response (generation/modification started)
-                    if (chatResult.project_id) {
-                        // Continue with existing flow
-                        this.currentProjectId = chatResult.project_id;
-                        // Let the existing code below handle the technical flow
+                    } else {
+                        // Handle error response
+                        throw new Error(chatResult.error || chatResult.message || 'Generation failed');
                     }
                 }
             } catch (error) {
-                console.log('Chat endpoint error:', error);
-                // Don't fall through to direct API calls if we already handled the request
-                if (this.currentProjectId && this.isGenerating) {
-                    console.log('Already processing, not falling back to direct API');
-                    return;
-                }
+                console.log('API endpoint error:', error);
+                this.removeTypingIndicator();
+                this.showError('Generation Failed', error.message);
+                this.addMessage('assistant', `I encountered an error: ${error.message}. Please try again or modify your request.`);
+                
+                // Reset UI state
+                this.isGenerating = false;
+                this.sendBtn.disabled = false;
+                this.sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+                return; // IMPORTANT: Exit here to prevent fallback code
             }
 
-            // Fallback to existing behavior if chat endpoint fails or doesn't handle it
-            // ONLY if the request wasn't already handled
-            if (requestHandled) {
-                console.log('Request already handled, not running fallback code');
-                return;
-            }
+            // IMPORTANT: Since we've handled the request above, always return here
+            return;
             
             if (this.currentProjectId) {
                 // Skip question detection - treat as modification
@@ -1036,8 +971,9 @@
             // It will be removed when we get a response
 
             try {
-                // Always use the /api/chat endpoint for both generation and modification
-                const endpoint = '/api/chat';
+                // Use appropriate endpoint based on whether we have a project
+                const isModification = !!this.currentProjectId;
+                const endpoint = isModification ? '/api/modify' : '/api/generate';
                 
                 // For new projects, generate project ID and connect WebSocket first
                 let projectId = this.currentProjectId;
@@ -1049,18 +985,15 @@
                     await new Promise(resolve => setTimeout(resolve, 100));
                 }
                 
-                // Get iOS version safely
-                const iosVersionElement = document.getElementById('iosVersion');
-                const iosVersion = iosVersionElement ? iosVersionElement.value : '17.0';
-                
-                // Use ChatRequest format for both generation and modification
-                const payload = {
-                    message: input,
-                    project_id: this.currentProjectId || projectId,
-                    context: {
-                        ios_version: iosVersion,
-                        is_modification: isModification
-                    }
+                // Build appropriate payload for each endpoint
+                const payload = isModification ? {
+                    project_id: this.currentProjectId,
+                    description: input,
+                    provider: 'grok'
+                } : {
+                    description: input,
+                    app_name: `App_${Date.now()}`,
+                    provider: 'grok'
                 };
 
                 // Debug logging
